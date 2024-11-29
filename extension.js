@@ -160,120 +160,121 @@ class FITSFileEditor {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monochrome Image Viewer with Line Profiles</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <style>
-    body { 
-        margin: 0; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        height: 100vh;
-        font-family: Arial, sans-serif;
-    }
-    #mainContainer {
-        display: flex;
-        align-items: stretch;
-        max-width: 100%;
-        max-height: 100vh;
-    }
-    #imageContainer {
-        position: relative;
-        flex-grow: 1;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    #loadedImage {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-    }
-    #lineProfiles {
-        display: flex;
-        flex-direction: column;
-        width: 200px;
-        margin-left: 10px;
-    }
-    #xProfile, #yProfile {
-        // background-color: #fff;
-    }
-    #spinner {
-        position: absolute;
-        width: 50px;
-        height: 50px;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #3498db;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    canvas {
-        image-rendering: optimizeSpeed;
-        image-rendering: -moz-crisp-edges;
-        image-rendering: -webkit-optimize-contrast;
-        image-rendering: -o-crisp-edges;
-        image-rendering: crisp-edges;
-        -ms-interpolation-mode: nearest-neighbor;
-    }
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Monochrome Image Viewer with Line Profiles</title>
+	<script src="https://d3js.org/d3.v7.min.js"></script>
+	<style>
+	body { 
+		margin: 0; 
+		display: flex; 
+		justify-content: center; 
+		align-items: center; 
+		height: 100vh;
+		font-family: Arial, sans-serif;
+	}
+	#mainContainer {
+		display: flex;
+		align-items: stretch;
+		max-width: 100%;
+		max-height: 100vh;
+	}
+	#imageContainer {
+		position: relative;
+		flex-grow: 1;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+	#loadedImage {
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
+	}
+	#lineProfiles {
+		display: flex;
+		flex-direction: column;
+		width: 200px;
+		margin-left: 10px;
+	}
+	#xProfile, #yProfile {
+		// background-color: #fff;
+	}
+	#spinner {
+		position: absolute;
+		width: 50px;
+		height: 50px;
+		border: 5px solid #f3f3f3;
+		border-top: 5px solid #3498db;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+	@keyframes spin {
+		0% { transform: rotate(0deg); }
+		100% { transform: rotate(360deg); }
+	}
+	canvas {
+		image-rendering: optimizeSpeed;
+		image-rendering: -moz-crisp-edges;
+		image-rendering: -webkit-optimize-contrast;
+		image-rendering: -o-crisp-edges;
+		image-rendering: crisp-edges;
+		-ms-interpolation-mode: nearest-neighbor;
+	}
 	.grid-container {
 		display: grid;
 		grid-template-columns: auto 100px;
 		grid-template-rows: auto 100px;
 		gap: 10px; /* Optional, for spacing between grid items */
 	}
-    </style>
+	</style>
 </head>
 <body>
-    <div id="spinner"></div>
-    <div class="mainContainer">
+	<div id="spinner"></div>
+	<div class="mainContainer">
 		<div class="grid-container">
 			<canvas id="loadedImage" style="display:none;"></canvas>
 			<canvas id="yProfile" style="display:none;"></canvas>
 			<canvas id="xProfile" style="display:none;"></canvas>
 		</div>
-    </div>
+	</div>
 
-    <script>
-    const vscode = acquireVsCodeApi();
-    const spinner = document.getElementById('spinner');
+	<script>
+	const vscode = acquireVsCodeApi();
+	const spinner = document.getElementById('spinner');
 
-    const canvas = document.getElementById('loadedImage');
-    const ctx = canvas.getContext('2d');
+	const canvas = document.getElementById('loadedImage');
+	const ctx = canvas.getContext('2d');
 
-    const xProfileCanvas = document.getElementById('xProfile');
-    const xProfileCtx = xProfileCanvas.getContext('2d');
-    const yProfileCanvas = document.getElementById('yProfile');
-    const yProfileCtx = yProfileCanvas.getContext('2d');
+	const xProfileCanvas = document.getElementById('xProfile');
+	const xProfileCtx = xProfileCanvas.getContext('2d');
+	const yProfileCanvas = document.getElementById('yProfile');
+	const yProfileCtx = yProfileCanvas.getContext('2d');
 	
 
-    let offscreenCanvas, offscreenCtx;
-    let imageWidth, imageHeight;
-    let currentTransform = d3.zoomIdentity;
-    let originalData = null;
+	let offscreenCanvas, offscreenCtx;
+	let imageWidth, imageHeight;
+	let currentTransform = d3.zoomIdentity;
+	let originalData = null;
+	let originalDataT = null;
 
-    function drawLineProfile(profileCtx, profileData, isHorizontal) {
+	function drawLineProfile(profileCtx, profileData, isHorizontal) {
 		
 		// set canvas size
-        profileCtx.clearRect(0, 0, profileCtx.canvas.width, profileCtx.canvas.height);
-        
-        // Find max value for scaling
-        const maxVal = Math.max(...profileData);
-        
-        // Draw background grid
-        profileCtx.strokeStyle = '#e0e0e0';
-        profileCtx.beginPath();
+		profileCtx.clearRect(0, 0, profileCtx.canvas.width, profileCtx.canvas.height);
+		
+		// Find max value for scaling
+		const maxVal = Math.max(...profileData);
+		
+		// Draw background grid
+		profileCtx.strokeStyle = '#e0e0e0';
+		profileCtx.beginPath();
 		if (isHorizontal) {
-        for (let i = 0; i <= 5; i++) {
-            const y = profileCtx.canvas.height * (1 - i/5);
-            profileCtx.moveTo(0, y);
-            profileCtx.lineTo(profileCtx.canvas.width, y);
-        }
+		for (let i = 0; i <= 5; i++) {
+			const y = profileCtx.canvas.height * (1 - i/5);
+			profileCtx.moveTo(0, y);
+			profileCtx.lineTo(profileCtx.canvas.width, y);
+		}
 		} else {
 			for (let i = 0; i <= 5; i++) {
 				const x = profileCtx.canvas.width * (1 - i/5);
@@ -281,21 +282,21 @@ class FITSFileEditor {
 				profileCtx.lineTo(x, profileCtx.canvas.height);
 			}
 		}
-        profileCtx.stroke();
-        
-        // Draw profile line
-        profileCtx.strokeStyle = 'white';
-        profileCtx.beginPath();
+		profileCtx.stroke();
+		
+		// Draw profile line
+		profileCtx.strokeStyle = 'white';
+		profileCtx.beginPath();
 		if (isHorizontal) {
-        profileData.forEach((val, index) => {
-            const x = (index / (profileData.length - 1)) * profileCtx.canvas.width;
-            const y = profileCtx.canvas.height * (1 - val/maxVal);
-            if (index === 0) {
-                profileCtx.moveTo(x, y);
-            } else {
-                profileCtx.lineTo(x, y);
-            }
-        });
+			profileData.forEach((val, index) => {
+				const x = (index / (profileData.length - 1)) * profileCtx.canvas.width;
+				const y = profileCtx.canvas.height * (1 - val/maxVal);
+				if (index === 0) {
+					profileCtx.moveTo(x, y);
+				} else {
+					profileCtx.lineTo(x, y);
+				}
+			});
 		} else {
 			profileData.forEach((val, index) => {
 				const x = profileCtx.canvas.width * (1 - val/maxVal);
@@ -304,47 +305,55 @@ class FITSFileEditor {
 
 					profileCtx.moveTo(x, y);
 				} else {
-				 	profileCtx.lineTo(x, y);
+					profileCtx.lineTo(x, y);
 				}
 			});
 		}
-        profileCtx.stroke();
-    }
+		profileCtx.stroke();
+	}
 
-    function renderMonochromeImage(normalizedData, width, height, originalPixelData) {
-        imageWidth = width;
-        imageHeight = height;
-        originalData = originalPixelData;
+	function renderMonochromeImage(normalizedData, width, height, originalPixelData) {
+		imageWidth = width;
+		imageHeight = height;
+		originalData = originalPixelData;
+		// Precompute the transposed data for vertical profiles
+		originalDataT = new Array(width);
+		for (let x = 0; x < width; x++) {
+			originalDataT[x] = new Array(height);
+			for (let y = 0; y < height; y++) {
+				originalDataT[x][y] = originalData[y * width + x];
+			}
+		}
 
-        const pixelData = new Uint8ClampedArray(normalizedData);
-        const imageData = new ImageData(width, height);
-        const data = imageData.data;
+		const pixelData = new Uint8ClampedArray(normalizedData);
+		const imageData = new ImageData(width, height);
+		const data = imageData.data;
 
-        for (let i = 0; i < pixelData.length; i++) {
-            const pixelValue = pixelData[i];
-            const index = i * 4;
-            data[index] = pixelValue;
-            data[index + 1] = pixelValue;
-            data[index + 2] = pixelValue;
-            data[index + 3] = 255;
-        }
+		for (let i = 0; i < pixelData.length; i++) {
+			const pixelValue = pixelData[i];
+			const index = i * 4;
+			data[index] = pixelValue;
+			data[index + 1] = pixelValue;
+			data[index + 2] = pixelValue;
+			data[index + 3] = 255;
+		}
 
-        canvas.width = width;
-        canvas.height = height;
+		canvas.width = width;
+		canvas.height = height;
 
-        offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = width;
-        offscreenCanvas.height = height;
-        offscreenCtx = offscreenCanvas.getContext('2d');
-        offscreenCtx.putImageData(imageData, 0, 0);
+		offscreenCanvas = document.createElement('canvas');
+		offscreenCanvas.width = width;
+		offscreenCanvas.height = height;
+		offscreenCtx = offscreenCanvas.getContext('2d');
+		offscreenCtx.putImageData(imageData, 0, 0);
 
-        ctx.drawImage(offscreenCanvas, 0, 0);
-        ctx.webkitImageSmoothingEnabled = false;
-        ctx.mozImageSmoothingEnabled = false;
-        ctx.imageSmoothingEnabled = false;
-        
-        spinner.style.display = 'none';
-        canvas.style.display = 'block';
+		ctx.drawImage(offscreenCanvas, 0, 0);
+		ctx.webkitImageSmoothingEnabled = false;
+		ctx.mozImageSmoothingEnabled = false;
+		ctx.imageSmoothingEnabled = false;
+		
+		spinner.style.display = 'none';
+		canvas.style.display = 'block';
 		xProfileCanvas.style.display = 'block';
 		yProfileCanvas.style.display = 'block';
 		xProfileCanvas.width = canvas.getBoundingClientRect().width;
@@ -352,75 +361,79 @@ class FITSFileEditor {
 		yProfileCanvas.width = 100;
 		yProfileCanvas.height = canvas.getBoundingClientRect().height;
 
-        // Add mousemove event listener to show pixel value and line profiles
-        canvas.addEventListener('mousemove', (event) => {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            
-            const x = Math.floor((event.clientX - rect.left) * scaleX);
-            const y = Math.floor((event.clientY - rect.top) * scaleY);
+		// Add mousemove event listener to show pixel value and line profiles
+		canvas.addEventListener('mousemove', (event) => {
+			const rect = canvas.getBoundingClientRect();
+			const scaleX = canvas.width / rect.width;
+			const scaleY = canvas.height / rect.height;
+			
+			const x = Math.floor((event.clientX - rect.left) * scaleX);
+			const y = Math.floor((event.clientY - rect.top) * scaleY);
 
-            // Apply the current transform to get the actual pixel coordinates
-            const transformedX = Math.floor((x - currentTransform.x) / currentTransform.k);
-            const transformedY = Math.floor((y - currentTransform.y) / currentTransform.k);
+			// Apply the current transform to get the actual pixel coordinates
+			const transformedX = Math.floor((x - currentTransform.x) / currentTransform.k);
+			const transformedY = Math.floor((y - currentTransform.y) / currentTransform.k);
 
-            if (transformedX >= 0 && transformedX < width && transformedY >= 0 && transformedY < height) {
-                // Extract X and Y line profiles
-                const xProfile = new Array(width).fill(0).map((_, i) => 
-                    originalData[transformedY * width + i]
-                );
-                const yProfile = new Array(height).fill(0).map((_, i) => 
-                    originalData[i * width + transformedX]
-                );
+			// current x width and y height in terms of pixels in the image
+			const xWidth = Math.floor(imageWidth / currentTransform.k);
+			const yHeight = Math.floor(imageHeight / currentTransform.k);
 
-                // Draw line profiles
-                drawLineProfile(xProfileCtx, xProfile, true);
-                drawLineProfile(yProfileCtx, yProfile, false);
+			// left and top of the image in terms of pixels in the image
+			const left = Math.floor(-currentTransform.x / currentTransform.k);
+			const top = Math.floor(-currentTransform.y / currentTransform.k);
 
-                console.log("Pixel value:", originalData[transformedY * width + transformedX]);
-            }
-        });
-    }
+			if (transformedX >= 0 && transformedX < width && transformedY >= 0 && transformedY < height) {
+				// Extract X and Y line profiles of region shown in the canvas
+				const xProfile = originalData.slice(transformedY * width + left, transformedY * width + left + xWidth + 1);
+				const yProfile = originalDataT[transformedX].slice(top, top + yHeight + 1);
 
-    function setupZoom() {
-        const zoom = d3.zoom()
-        .scaleExtent([1, 30]) // Zoom range
-        .on('zoom', (event) => {
-            const transform = event.transform;
-            currentTransform = transform;
+				// Draw line profiles
+				drawLineProfile(xProfileCtx, xProfile, true);
+				drawLineProfile(yProfileCtx, yProfile, false);
 
-            // Compute visible canvas size and resample from the original resolution
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            ctx.translate(transform.x, transform.y);
-            ctx.scale(transform.k, transform.k);
+				console.log("Pixel value:", originalData[transformedY * width + transformedX], "at:", transformedX, transformedY);
+			}
+		});
+	}
 
-            // Redraw the original image with the appropriate transformation
-            ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
-            ctx.restore();
-        });
+	function setupZoom() {
+		const zoom = d3.zoom()
+		.scaleExtent([1, 40]) // Zoom range
+		.on('zoom', (event) => {
+			const transform = event.transform;
+			currentTransform = transform;
 
-        d3.select(canvas).call(zoom);
-    }
+			// Compute visible canvas size and resample from the original resolution
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.save();
+			ctx.translate(transform.x, transform.y);
+			ctx.scale(transform.k, transform.k);
 
-    window.addEventListener('message', (event) => {
-        const message = event.data;
-        if (message.command === 'loadData') {
-            requestAnimationFrame(() => {
-                renderMonochromeImage(
-                    message.data, 
-                    message.width, 
-                    message.height,
-                    message.originalData
-                );
-                setupZoom(); // Initialize zoom after rendering
-            });
-        }
-    });
+			// Redraw the original image with the appropriate transformation
+			ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
+			ctx.restore();
+		});
 
-    vscode.postMessage({ command: 'ready' });
-    </script>
+		d3.select(canvas).call(zoom);
+	}
+
+	window.addEventListener('message', (event) => {
+		const message = event.data;
+		if (message.command === 'loadData') {
+			requestAnimationFrame(() => {
+				renderMonochromeImage(
+					message.data, 
+					message.width, 
+					message.height,
+					message.originalData
+				);
+				setupZoom(); // Initialize zoom after rendering
+			});
+		}
+	});
+
+	vscode.postMessage({ command: 'ready' });
+	</script>
 </body>
 </html>
 
