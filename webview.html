@@ -246,10 +246,10 @@
 
           // Apply the current transform to get the actual pixel coordinates
           const transformedX = Math.floor(
-            (x - currentTransform.x) / currentTransform.k
+            (x - currentTransform.x/scaleFactor) / currentTransform.k
           );
           const transformedY = Math.floor(
-            (y - currentTransform.y) / currentTransform.k
+            (y - currentTransform.y/scaleFactor) / currentTransform.k
           );
 
           // current x width and y height in terms of pixels in the image
@@ -257,8 +257,8 @@
           const yHeight = Math.floor(imageHeight / currentTransform.k);
 
           // left and top of the image in terms of pixels in the image
-          const left = Math.floor(-currentTransform.x / currentTransform.k);
-          const top = Math.floor(-currentTransform.y / currentTransform.k);
+          const left = Math.floor(-currentTransform.x/scaleFactor / currentTransform.k);
+          const top = Math.floor(-currentTransform.y/scaleFactor / currentTransform.k);
 
           if (
             transformedX >= 0 &&
