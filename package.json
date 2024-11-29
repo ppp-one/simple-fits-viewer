@@ -1,0 +1,41 @@
+{
+  "name": "simple-fits-viewer",
+  "displayName": "Simple FITS viewer",
+  "description": "Preview FITS images in VSCode.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "main": "extension.js",
+  "activationEvents": [
+      "onCustomEditor:fitFileViewer"
+  ],
+  "contributes": {
+      "customEditors": [
+          {
+              "viewType": "fitFileViewer",
+              "displayName": "FITS File Viewer",
+              "selector": [
+                  {
+                      "filenamePattern": "*.fit",
+                      "priority": "default"
+                  },
+                  {
+                      "filenamePattern": "*.fits",
+                      "priority": "default"
+                  }
+              ]
+          }
+      ]
+  },
+  "scripts": {
+      "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+      "fits",
+      "astronomy",
+      "file viewer"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
