@@ -157,169 +157,272 @@ class FITSFileEditor {
 
     getWebviewContent() {
 		return `
-			<!DOCTYPE html>
-	<html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>Monochrome Image Viewer</title>
-		<script src="https://d3js.org/d3.v7.min.js"></script>
-		<style>
-		body { 
-			margin: 0; 
-			display: flex; 
-			justify-content: center; 
-			align-items: center; 
-			height: 100vh; 
-		}
-		#imageContainer {
-			max-width: 100%;
-			max-height: 100vh;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-		}
-		#loadedImage {
-			max-width: 100%;
-			max-height: 100vh;
-			object-fit: contain;
-		}
-		#spinner {
-			position: absolute;
-			width: 50px;
-			height: 50px;
-			border: 5px solid #f3f3f3;
-			border-top: 5px solid #3498db;
-			border-radius: 50%;
-			animation: spin 1s linear infinite;
-		}
-		@keyframes spin {
-			0% { transform: rotate(0deg); }
-			100% { transform: rotate(360deg); }
-		}
-			canvas {
-				image-rendering: optimizeSpeed;             // Older versions of FF
-				image-rendering: -moz-crisp-edges;          // FF 6.0+
-				image-rendering: -webkit-optimize-contrast; // Webkit (non standard naming)
-				image-rendering: -o-crisp-edges;            // OS X & Windows Opera (12.02+)
-				image-rendering: crisp-edges;               // Possible future browsers.
-				-ms-interpolation-mode: nearest-neighbor;   // IE (non standard naming)
-			}
-		</style>
-	</head>
-	<body>
-		<div id="spinner"></div>
-		<div id="imageContainer">
-		<canvas id="loadedImage" style="display:none;"></canvas>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monochrome Image Viewer with Line Profiles</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+    body { 
+        margin: 0; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        height: 100vh;
+        font-family: Arial, sans-serif;
+    }
+    #mainContainer {
+        display: flex;
+        align-items: stretch;
+        max-width: 100%;
+        max-height: 100vh;
+    }
+    #imageContainer {
+        position: relative;
+        flex-grow: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    #loadedImage {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    #lineProfiles {
+        display: flex;
+        flex-direction: column;
+        width: 200px;
+        margin-left: 10px;
+    }
+    #xProfile, #yProfile {
+        // background-color: #fff;
+    }
+    #spinner {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    canvas {
+        image-rendering: optimizeSpeed;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: -o-crisp-edges;
+        image-rendering: crisp-edges;
+        -ms-interpolation-mode: nearest-neighbor;
+    }
+	.grid-container {
+		display: grid;
+		grid-template-columns: auto 100px;
+		grid-template-rows: auto 100px;
+		gap: 10px; /* Optional, for spacing between grid items */
+	}
+    </style>
+</head>
+<body>
+    <div id="spinner"></div>
+    <div class="mainContainer">
+		<div class="grid-container">
+			<canvas id="loadedImage" style="display:none;"></canvas>
+			<canvas id="yProfile" style="display:none;"></canvas>
+			<canvas id="xProfile" style="display:none;"></canvas>
 		</div>
+    </div>
 
-		<script>
-		const vscode = acquireVsCodeApi();
-		const spinner = document.getElementById('spinner');
-		const imageContainer = document.getElementById('imageContainer');
-		const canvas = document.getElementById('loadedImage');
-		const ctx = canvas.getContext('2d');
+    <script>
+    const vscode = acquireVsCodeApi();
+    const spinner = document.getElementById('spinner');
 
-		let offscreenCanvas, offscreenCtx;
-		let imageWidth, imageHeight;
-		let currentTransform = d3.zoomIdentity;
+    const canvas = document.getElementById('loadedImage');
+    const ctx = canvas.getContext('2d');
 
-		function renderMonochromeImage(normalizedData, width, height, originalData) {
-			imageWidth = width;
-			imageHeight = height;
+    const xProfileCanvas = document.getElementById('xProfile');
+    const xProfileCtx = xProfileCanvas.getContext('2d');
+    const yProfileCanvas = document.getElementById('yProfile');
+    const yProfileCtx = yProfileCanvas.getContext('2d');
+	
 
-			const pixelData = new Uint8ClampedArray(normalizedData);
-			const imageData = new ImageData(width, height);
-			const data = imageData.data;
-				console.log("shape of originalData: ", originalData.length);
-				console.log("shape of originalData: ", originalData[0].length);
-				console.log("shape of normalizedData: ", normalizedData.length);
+    let offscreenCanvas, offscreenCtx;
+    let imageWidth, imageHeight;
+    let currentTransform = d3.zoomIdentity;
+    let originalData = null;
 
-			for (let i = 0; i < pixelData.length; i++) {
-			const pixelValue = pixelData[i];
-			const index = i * 4;
-			data[index] = pixelValue;
-			data[index + 1] = pixelValue;
-			data[index + 2] = pixelValue;
-			data[index + 3] = 255;
+    function drawLineProfile(profileCtx, profileData, isHorizontal) {
+		
+		// set canvas size
+        profileCtx.clearRect(0, 0, profileCtx.canvas.width, profileCtx.canvas.height);
+        
+        // Find max value for scaling
+        const maxVal = Math.max(...profileData);
+        
+        // Draw background grid
+        profileCtx.strokeStyle = '#e0e0e0';
+        profileCtx.beginPath();
+		if (isHorizontal) {
+        for (let i = 0; i <= 5; i++) {
+            const y = profileCtx.canvas.height * (1 - i/5);
+            profileCtx.moveTo(0, y);
+            profileCtx.lineTo(profileCtx.canvas.width, y);
+        }
+		} else {
+			for (let i = 0; i <= 5; i++) {
+				const x = profileCtx.canvas.width * (1 - i/5);
+				profileCtx.moveTo(x, 0);
+				profileCtx.lineTo(x, profileCtx.canvas.height);
 			}
-
-			canvas.width = width;
-			canvas.height = height;
-
-			offscreenCanvas = document.createElement('canvas');
-			offscreenCanvas.width = width;
-			offscreenCanvas.height = height;
-			offscreenCtx = offscreenCanvas.getContext('2d');
-			offscreenCtx.putImageData(imageData, 0, 0);
-
-			ctx.drawImage(offscreenCanvas, 0, 0);
-				ctx.webkitImageSmoothingEnabled = false;
-				ctx.mozImageSmoothingEnabled = false;
-				ctx.imageSmoothingEnabled = false;
-				
-			spinner.style.display = 'none';
-			canvas.style.display = 'block';
-
-				// Add mousemove event listener to show pixel value
-				canvas.addEventListener('mousemove', (event) => {
-			const rect = canvas.getBoundingClientRect();
-			const scaleX = canvas.width / rect.width;
-			const scaleY = canvas.height / rect.height;
-					
-			const x = Math.floor((event.clientX - rect.left) * scaleX);
-			const y = Math.floor((event.clientY - rect.top) * scaleY);
-
-			// Apply the current transform to get the actual pixel coordinates
-			const transformedX = Math.floor((x - currentTransform.x) / currentTransform.k);
-			const transformedY = Math.floor((y - currentTransform.y) / currentTransform.k);
-
-			if (transformedX >= 0 && transformedX < width && transformedY >= 0 && transformedY < height) {
-				console.log("Pixel value:", originalData[transformedY * width + transformedX]);
-			}
-				});
 		}
+        profileCtx.stroke();
+        
+        // Draw profile line
+        profileCtx.strokeStyle = 'white';
+        profileCtx.beginPath();
+		if (isHorizontal) {
+        profileData.forEach((val, index) => {
+            const x = (index / (profileData.length - 1)) * profileCtx.canvas.width;
+            const y = profileCtx.canvas.height * (1 - val/maxVal);
+            if (index === 0) {
+                profileCtx.moveTo(x, y);
+            } else {
+                profileCtx.lineTo(x, y);
+            }
+        });
+		} else {
+			profileData.forEach((val, index) => {
+				const x = profileCtx.canvas.width * (1 - val/maxVal);
+				const y = (index / (profileData.length - 1)) * profileCtx.canvas.height;
+				if (index === 0) {
 
-		function setupZoom() {
-			const zoom = d3.zoom()
-			.scaleExtent([0.5, 30]) // Zoom range
-			.on('zoom', (event) => {
-				const transform = event.transform;
-				currentTransform = transform;
-
-				// Compute visible canvas size and resample from the original resolution
-				ctx.clearRect(0, 0, canvas.width, canvas.height);
-				ctx.save();
-				ctx.translate(transform.x, transform.y);
-				ctx.scale(transform.k, transform.k);
-
-				// Redraw the original image with the appropriate transformation
-				ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
-				ctx.restore();
+					profileCtx.moveTo(x, y);
+				} else {
+				 	profileCtx.lineTo(x, y);
+				}
 			});
-
-			d3.select(canvas).call(zoom);
 		}
+        profileCtx.stroke();
+    }
 
-		window.addEventListener('message', (event) => {
-			const message = event.data;
-			if (message.command === 'loadData') {
-			requestAnimationFrame(() => {
-				renderMonochromeImage(
-				message.data, 
-				message.width, 
-				message.height,
-							message.originalData
-				);
-				setupZoom(); // Initialize zoom after rendering
-			});
-			}
-		});
+    function renderMonochromeImage(normalizedData, width, height, originalPixelData) {
+        imageWidth = width;
+        imageHeight = height;
+        originalData = originalPixelData;
 
-		vscode.postMessage({ command: 'ready' });
-		</script>
-	</body>
-	</html>
+        const pixelData = new Uint8ClampedArray(normalizedData);
+        const imageData = new ImageData(width, height);
+        const data = imageData.data;
+
+        for (let i = 0; i < pixelData.length; i++) {
+            const pixelValue = pixelData[i];
+            const index = i * 4;
+            data[index] = pixelValue;
+            data[index + 1] = pixelValue;
+            data[index + 2] = pixelValue;
+            data[index + 3] = 255;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+        offscreenCtx = offscreenCanvas.getContext('2d');
+        offscreenCtx.putImageData(imageData, 0, 0);
+
+        ctx.drawImage(offscreenCanvas, 0, 0);
+        ctx.webkitImageSmoothingEnabled = false;
+        ctx.mozImageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = false;
+        
+        spinner.style.display = 'none';
+        canvas.style.display = 'block';
+		xProfileCanvas.style.display = 'block';
+		yProfileCanvas.style.display = 'block';
+		xProfileCanvas.width = canvas.getBoundingClientRect().width;
+		xProfileCanvas.height = 100;
+		yProfileCanvas.width = 100;
+		yProfileCanvas.height = canvas.getBoundingClientRect().height;
+
+        // Add mousemove event listener to show pixel value and line profiles
+        canvas.addEventListener('mousemove', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const x = Math.floor((event.clientX - rect.left) * scaleX);
+            const y = Math.floor((event.clientY - rect.top) * scaleY);
+
+            // Apply the current transform to get the actual pixel coordinates
+            const transformedX = Math.floor((x - currentTransform.x) / currentTransform.k);
+            const transformedY = Math.floor((y - currentTransform.y) / currentTransform.k);
+
+            if (transformedX >= 0 && transformedX < width && transformedY >= 0 && transformedY < height) {
+                // Extract X and Y line profiles
+                const xProfile = new Array(width).fill(0).map((_, i) => 
+                    originalData[transformedY * width + i]
+                );
+                const yProfile = new Array(height).fill(0).map((_, i) => 
+                    originalData[i * width + transformedX]
+                );
+
+                // Draw line profiles
+                drawLineProfile(xProfileCtx, xProfile, true);
+                drawLineProfile(yProfileCtx, yProfile, false);
+
+                console.log("Pixel value:", originalData[transformedY * width + transformedX]);
+            }
+        });
+    }
+
+    function setupZoom() {
+        const zoom = d3.zoom()
+        .scaleExtent([1, 30]) // Zoom range
+        .on('zoom', (event) => {
+            const transform = event.transform;
+            currentTransform = transform;
+
+            // Compute visible canvas size and resample from the original resolution
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(transform.x, transform.y);
+            ctx.scale(transform.k, transform.k);
+
+            // Redraw the original image with the appropriate transformation
+            ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
+            ctx.restore();
+        });
+
+        d3.select(canvas).call(zoom);
+    }
+
+    window.addEventListener('message', (event) => {
+        const message = event.data;
+        if (message.command === 'loadData') {
+            requestAnimationFrame(() => {
+                renderMonochromeImage(
+                    message.data, 
+                    message.width, 
+                    message.height,
+                    message.originalData
+                );
+                setupZoom(); // Initialize zoom after rendering
+            });
+        }
+    });
+
+    vscode.postMessage({ command: 'ready' });
+    </script>
+</body>
+</html>
 
 		`;
     }
