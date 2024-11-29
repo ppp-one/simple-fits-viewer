@@ -40,7 +40,7 @@ class FITSFileEditor {
 
 				// Step 3: Parse the FITS header and data
 				const parseStartTime = Date.now();
-				const [headerInfo, normalizedData, width, height] = this.parseFITSHeader(arrayBuffer, dataView);
+				const [headerInfo, normalizedData, width, height, rawData] = this.parseFITSHeader(arrayBuffer, dataView);
 				const parseEndTime = Date.now();
 				console.log(`Parsing FITS file took ${parseEndTime - parseStartTime} ms`);
 
@@ -61,7 +61,8 @@ class FITSFileEditor {
                                 command: 'loadData',
                                 data: normalizedData,
                                 width: width,
-                                height: height
+                                height: height,
+								originalData: rawData
                             });
                         }
                     },
@@ -151,152 +152,176 @@ class FITSFileEditor {
 		
 
 		// console.log(header, normalizedData);
-        return [ header, normalizedData , width, height ];
+        return [ header, normalizedData , width, height, data ];
     }
 
-    getWebviewContent(headerInfo, width, height) {
-        return `
-		<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monochrome Image Viewer</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <style>
-        body { 
-            margin: 0; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh; 
-        }
-        #imageContainer {
-            max-width: 100%;
-            max-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #loadedImage {
-            max-width: 100%;
-            max-height: 100vh;
-            object-fit: contain;
-        }
-        #spinner {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-		canvas {
-			image-rendering: optimizeSpeed;             // Older versions of FF
-			image-rendering: -moz-crisp-edges;          // FF 6.0+
-			image-rendering: -webkit-optimize-contrast; // Webkit (non standard naming)
-			image-rendering: -o-crisp-edges;            // OS X & Windows Opera (12.02+)
-			image-rendering: crisp-edges;               // Possible future browsers.
-			-ms-interpolation-mode: nearest-neighbor;   // IE (non standard naming)
+    getWebviewContent() {
+		return `
+			<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Monochrome Image Viewer</title>
+		<script src="https://d3js.org/d3.v7.min.js"></script>
+		<style>
+		body { 
+			margin: 0; 
+			display: flex; 
+			justify-content: center; 
+			align-items: center; 
+			height: 100vh; 
 		}
-    </style>
-</head>
-<body>
-    <div id="spinner"></div>
-    <div id="imageContainer">
-        <canvas id="loadedImage" style="display:none;"></canvas>
-    </div>
+		#imageContainer {
+			max-width: 100%;
+			max-height: 100vh;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+		}
+		#loadedImage {
+			max-width: 100%;
+			max-height: 100vh;
+			object-fit: contain;
+		}
+		#spinner {
+			position: absolute;
+			width: 50px;
+			height: 50px;
+			border: 5px solid #f3f3f3;
+			border-top: 5px solid #3498db;
+			border-radius: 50%;
+			animation: spin 1s linear infinite;
+		}
+		@keyframes spin {
+			0% { transform: rotate(0deg); }
+			100% { transform: rotate(360deg); }
+		}
+			canvas {
+				image-rendering: optimizeSpeed;             // Older versions of FF
+				image-rendering: -moz-crisp-edges;          // FF 6.0+
+				image-rendering: -webkit-optimize-contrast; // Webkit (non standard naming)
+				image-rendering: -o-crisp-edges;            // OS X & Windows Opera (12.02+)
+				image-rendering: crisp-edges;               // Possible future browsers.
+				-ms-interpolation-mode: nearest-neighbor;   // IE (non standard naming)
+			}
+		</style>
+	</head>
+	<body>
+		<div id="spinner"></div>
+		<div id="imageContainer">
+		<canvas id="loadedImage" style="display:none;"></canvas>
+		</div>
 
-    <script>
-        const vscode = acquireVsCodeApi();
-        const spinner = document.getElementById('spinner');
-        const imageContainer = document.getElementById('imageContainer');
-        const canvas = document.getElementById('loadedImage');
-        const ctx = canvas.getContext('2d');
+		<script>
+		const vscode = acquireVsCodeApi();
+		const spinner = document.getElementById('spinner');
+		const imageContainer = document.getElementById('imageContainer');
+		const canvas = document.getElementById('loadedImage');
+		const ctx = canvas.getContext('2d');
 
-        let offscreenCanvas, offscreenCtx;
-        let imageWidth, imageHeight;
+		let offscreenCanvas, offscreenCtx;
+		let imageWidth, imageHeight;
+		let currentTransform = d3.zoomIdentity;
 
-        function renderMonochromeImage(normalizedData, width, height) {
-            imageWidth = width;
-            imageHeight = height;
+		function renderMonochromeImage(normalizedData, width, height, originalData) {
+			imageWidth = width;
+			imageHeight = height;
 
-            const pixelData = new Uint8ClampedArray(normalizedData);
-            const imageData = new ImageData(width, height);
-            const data = imageData.data;
+			const pixelData = new Uint8ClampedArray(normalizedData);
+			const imageData = new ImageData(width, height);
+			const data = imageData.data;
+				console.log("shape of originalData: ", originalData.length);
+				console.log("shape of originalData: ", originalData[0].length);
+				console.log("shape of normalizedData: ", normalizedData.length);
 
-            for (let i = 0; i < pixelData.length; i++) {
-                const pixelValue = pixelData[i];
-                const index = i * 4;
-                data[index] = pixelValue;
-                data[index + 1] = pixelValue;
-                data[index + 2] = pixelValue;
-                data[index + 3] = 255;
-            }
+			for (let i = 0; i < pixelData.length; i++) {
+			const pixelValue = pixelData[i];
+			const index = i * 4;
+			data[index] = pixelValue;
+			data[index + 1] = pixelValue;
+			data[index + 2] = pixelValue;
+			data[index + 3] = 255;
+			}
 
-            canvas.width = width;
-            canvas.height = height;
+			canvas.width = width;
+			canvas.height = height;
 
-            offscreenCanvas = document.createElement('canvas');
-            offscreenCanvas.width = width;
-            offscreenCanvas.height = height;
-            offscreenCtx = offscreenCanvas.getContext('2d');
-            offscreenCtx.putImageData(imageData, 0, 0);
+			offscreenCanvas = document.createElement('canvas');
+			offscreenCanvas.width = width;
+			offscreenCanvas.height = height;
+			offscreenCtx = offscreenCanvas.getContext('2d');
+			offscreenCtx.putImageData(imageData, 0, 0);
 
-            ctx.drawImage(offscreenCanvas, 0, 0);
-			ctx.webkitImageSmoothingEnabled = false;
-			ctx.mozImageSmoothingEnabled = false;
-			ctx.imageSmoothingEnabled = false;
-			
-            spinner.style.display = 'none';
-            canvas.style.display = 'block';
-        }
+			ctx.drawImage(offscreenCanvas, 0, 0);
+				ctx.webkitImageSmoothingEnabled = false;
+				ctx.mozImageSmoothingEnabled = false;
+				ctx.imageSmoothingEnabled = false;
+				
+			spinner.style.display = 'none';
+			canvas.style.display = 'block';
 
-        function setupZoom() {
-            const zoom = d3.zoom()
-                .scaleExtent([0.5, 30]) // Zoom range
-                .on('zoom', (event) => {
-                    const transform = event.transform;
+				// Add mousemove event listener to show pixel value
+				canvas.addEventListener('mousemove', (event) => {
+			const rect = canvas.getBoundingClientRect();
+			const scaleX = canvas.width / rect.width;
+			const scaleY = canvas.height / rect.height;
+					
+			const x = Math.floor((event.clientX - rect.left) * scaleX);
+			const y = Math.floor((event.clientY - rect.top) * scaleY);
 
-                    // Compute visible canvas size and resample from the original resolution
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.save();
-                    ctx.translate(transform.x, transform.y);
-                    ctx.scale(transform.k, transform.k);
+			// Apply the current transform to get the actual pixel coordinates
+			const transformedX = Math.floor((x - currentTransform.x) / currentTransform.k);
+			const transformedY = Math.floor((y - currentTransform.y) / currentTransform.k);
 
-                    // Redraw the original image with the appropriate transformation
-                    ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
-                    ctx.restore();
-                });
+			if (transformedX >= 0 && transformedX < width && transformedY >= 0 && transformedY < height) {
+				console.log("Pixel value:", originalData[transformedY * width + transformedX]);
+			}
+				});
+		}
 
-            d3.select(canvas).call(zoom);
-        }
+		function setupZoom() {
+			const zoom = d3.zoom()
+			.scaleExtent([0.5, 30]) // Zoom range
+			.on('zoom', (event) => {
+				const transform = event.transform;
+				currentTransform = transform;
 
-        window.addEventListener('message', (event) => {
-            const message = event.data;
-            if (message.command === 'loadData') {
-                requestAnimationFrame(() => {
-                    renderMonochromeImage(
-                        message.data, 
-                        message.width, 
-                        message.height
-                    );
-                    setupZoom(); // Initialize zoom after rendering
-                });
-            }
-        });
+				// Compute visible canvas size and resample from the original resolution
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				ctx.save();
+				ctx.translate(transform.x, transform.y);
+				ctx.scale(transform.k, transform.k);
 
-        vscode.postMessage({ command: 'ready' });
-    </script>
-</body>
-</html>
+				// Redraw the original image with the appropriate transformation
+				ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
+				ctx.restore();
+			});
 
-        `;
+			d3.select(canvas).call(zoom);
+		}
+
+		window.addEventListener('message', (event) => {
+			const message = event.data;
+			if (message.command === 'loadData') {
+			requestAnimationFrame(() => {
+				renderMonochromeImage(
+				message.data, 
+				message.width, 
+				message.height,
+							message.originalData
+				);
+				setupZoom(); // Initialize zoom after rendering
+			});
+			}
+		});
+
+		vscode.postMessage({ command: 'ready' });
+		</script>
+	</body>
+	</html>
+
+		`;
     }
 }
 
