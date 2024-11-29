@@ -40,13 +40,13 @@ class FITSFileEditor {
 
 				// Step 3: Parse the FITS header and data
 				const parseStartTime = Date.now();
-				const [headerInfo, normalizedData, width, height, rawData] = this.parseFITSHeader(arrayBuffer, dataView);
+				const [headerInfo, normalizedData, width, height, rawData] = this.parseFITSImage(arrayBuffer, dataView);
 				const parseEndTime = Date.now();
 				console.log(`Parsing FITS file took ${parseEndTime - parseStartTime} ms`);
 
 				// Step 4: Update the webview content
 				const updateStartTime = Date.now();
-				webviewPanel.webview.html = this.getWebviewContent(headerInfo, width, height);
+				webviewPanel.webview.html = this.getWebviewContent();
 				const updateEndTime = Date.now();
 				console.log(`Updating webview content took ${updateEndTime - updateStartTime} ms`);
 
@@ -54,7 +54,8 @@ class FITSFileEditor {
 				console.log(`Total FITS file processing took ${endTime - startTime} ms`);
 
                 webviewPanel.webview.onDidReceiveMessage(
-                    message => {
+					message => {
+						console.log('Received message from webview');
                         if (message.command === 'ready') {
 							console.log('Webview is ready');
                             webviewPanel.webview.postMessage({
@@ -62,7 +63,8 @@ class FITSFileEditor {
                                 data: normalizedData,
                                 width: width,
                                 height: height,
-								originalData: rawData
+								originalData: rawData,
+								header: headerInfo
                             });
                         }
                     },
@@ -93,7 +95,7 @@ class FITSFileEditor {
 		console.log(`resolveCustomTextEditor took ${endTime0 - startTime0} ms`);
     }
 
-    parseFITSHeader(arrayBuffer, dataView) {
+    parseFITSImage(arrayBuffer, dataView) {
 
         // Very basic FITS header parsing
         let headerText = '';
@@ -103,7 +105,7 @@ class FITSFileEditor {
           const block = new TextDecoder().decode(arrayBuffer.slice(offset, offset + headerSize));
           headerText += block;
           offset += headerSize;
-          if (block.includes('END')) break;
+          if (block.trim().endsWith('END')) break;
         }
 
 		// Parse Header Keywords
@@ -116,16 +118,22 @@ class FITSFileEditor {
           header[keyword] = value;
         }
 
+		console.log(header);
+
 		const width = parseInt(header['NAXIS1'], 10);
         const height = parseInt(header['NAXIS2'], 10);
         const bitpix = parseInt(header['BITPIX'], 10);
         const bscale = parseFloat(header['BSCALE']) || 1;
         const bzero = parseFloat(header['BZERO']) || 0;
 
+		console.log("width: ", width, "height: ", height, "bitpix: ", bitpix, "bscale: ", bscale, "bzero: ", bzero);
+
 		// Parse Image Data
         const dataSize = width * height;
         const bytesPerPixel = Math.abs(bitpix) / 8;
         const data = [];
+
+        console.log("dataSize: ", dataSize, "bytesPerPixel: ", bytesPerPixel);
 
         for (let i = 0; i < dataSize; i++) {
           let pixelValue;

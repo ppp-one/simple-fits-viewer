@@ -99,6 +99,7 @@
       let currentTransform = d3.zoomIdentity;
       let originalData = null;
       let originalDataT = null;
+      let scaleFactor = 1;
 
       function drawLineProfile(profileCtx, profileData, isHorizontal) {
         // set canvas size
@@ -141,6 +142,13 @@
             if (index === 0) {
               profileCtx.moveTo(x, y);
             } else {
+              const prevX =
+                ((index - 1) / (profileData.length - 1)) *
+                profileCtx.canvas.width;
+              const prevY =
+                profileCtx.canvas.height *
+                (1 - profileData[index - 1] / maxVal);
+              profileCtx.lineTo(x, prevY);
               profileCtx.lineTo(x, y);
             }
           });
@@ -152,6 +160,12 @@
             if (index === 0) {
               profileCtx.moveTo(x, y);
             } else {
+              const prevX =
+                profileCtx.canvas.width * (1 - profileData[index - 1] / maxVal);
+              const prevY =
+                ((index - 1) / (profileData.length - 1)) *
+                profileCtx.canvas.height;
+              profileCtx.lineTo(prevX, y);
               profileCtx.lineTo(x, y);
             }
           });
@@ -168,6 +182,7 @@
         imageWidth = width;
         imageHeight = height;
         originalData = originalPixelData;
+
         // Precompute the transposed data for vertical profiles
         originalDataT = new Array(width);
         for (let x = 0; x < width; x++) {
@@ -177,7 +192,7 @@
           }
         }
 
-        const pixelData = new Uint8ClampedArray(normalizedData);
+        const pixelData = normalizedData;
         const imageData = new ImageData(width, height);
         const data = imageData.data;
 
@@ -190,8 +205,8 @@
           data[index + 3] = 255;
         }
 
-        canvas.width = width - 100;
-        canvas.height = height - 100;
+        canvas.width = width;
+        canvas.height = height;
         
         offscreenCanvas = document.createElement("canvas");
         offscreenCanvas.width = width;
@@ -203,6 +218,14 @@
         ctx.webkitImageSmoothingEnabled = false;
         ctx.mozImageSmoothingEnabled = false;
         ctx.imageSmoothingEnabled = false;
+
+        // rescale the canvas to fit the window
+        scaleFactor = Math.min(
+          window.innerWidth / width,
+          window.innerHeight / height
+        );
+        canvas.style.width = `${width * scaleFactor - 100}px`;
+        canvas.style.height = `${height * scaleFactor - 100}px`;
 
         spinner.style.display = "none";
         canvas.style.display = "block";
@@ -246,11 +269,11 @@
             // Extract X and Y line profiles of region shown in the canvas
             const xProfile = originalData.slice(
               transformedY * width + left,
-              transformedY * width + left + xWidth + 1
+              transformedY * width + left + xWidth + 2
             );
             const yProfile = originalDataT[transformedX].slice(
               top,
-              top + yHeight + 1
+              top + yHeight + 2
             );
 
             // Draw line profiles
@@ -271,15 +294,22 @@
       function setupZoom() {
         const zoom = d3
           .zoom()
-          .scaleExtent([1, 40]) // Zoom range
+          .scaleExtent([1, 100]) // Zoom range
           .on("zoom", (event) => {
-            const transform = event.transform;
+            // console.log("Zoom event", event.transform);
+            let transform = event.transform;
             currentTransform = transform;
+
+            // Constrain translation to prevent panning out of canvas
+            const maxX = Math.max(0, (canvas.width - imageWidth * transform.k) / 2);
+            const maxY = Math.max(0, (canvas.height - imageHeight * transform.k) / 2);
+            transform.x = Math.min(maxX, Math.max(transform.x, canvas.width - imageWidth * transform.k - maxX));
+            transform.y = Math.min(maxY, Math.max(transform.y, canvas.height - imageHeight * transform.k - maxY));
 
             // Compute visible canvas size and resample from the original resolution
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
-            ctx.translate(transform.x, transform.y);
+            ctx.translate(transform.x/scaleFactor, transform.y/scaleFactor);
             ctx.scale(transform.k, transform.k);
 
             // Redraw the original image with the appropriate transformation
@@ -298,7 +328,8 @@
               message.data,
               message.width,
               message.height,
-              message.originalData
+              message.originalData,
+              message.header
             );
             setupZoom(); // Initialize zoom after rendering
           });
