@@ -11,13 +11,13 @@
         margin: 0;
         display: flex;
         justify-content: center;
-        align-items: center;
+        /* align-items: center; */
         height: 100%; /* Ensure body takes full viewport height */
         font-family: Arial, sans-serif;
       }
       #mainContainer {
         display: flex;
-        align-items: stretch;
+        /* align-items: stretch; */
         width: 100%; /* Ensure main container takes full width */
         height: 100%; /* Ensure main container takes full height */
       }
@@ -30,7 +30,6 @@
       #loadedImage {
         max-width: 100%;
         max-height: 100%;
-        // object-fit: contain;
       }
       #lineProfiles {
         display: flex;
@@ -70,15 +69,35 @@
         flex-grow: 1; /* added */
         min-height: 0; /* here */
       }
+      .header-container {
+        display: none;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 2px 16px;
+      }
+
+      tr:hover {
+        background-color: #f5f5f523;
+      }
     </style>
   </head>
   <body>
-    <div id="spinner"></div>
-    <div class="mainContainer">
+    <div style="display: flex; align-items: center; height: 100%">
+      <div id="spinner"></div>
+    </div>
+    <div class="mainContainer" style="display: none">
       <div class="grid-container">
-        <canvas id="loadedImage" style="display: none"></canvas>
-        <canvas id="yProfile" style="display: none" width="100"></canvas>
-        <canvas id="xProfile" style="display: none" height="100"></canvas>
+        <canvas id="loadedImage"></canvas>
+        <canvas id="yProfile" width="100"></canvas>
+        <canvas id="xProfile" height="100"></canvas>
         <div
           id="cursor"
           style="
@@ -91,7 +110,22 @@
         >
           <p id="pixelValue"></p>
           <p id="pixelPosition"></p>
+          <p id="headerTab" style="cursor: pointer">header ></p>
         </div>
+      </div>
+      <div
+        class="header-container"
+        id="headerContainer"
+        style="
+          text-align: left;
+          padding-top: 10px;
+          font-weight: 200;
+          font-family: Verdana, Geneva, Tahoma, sans-serif;
+          opacity: 0.5;
+        "
+      >
+        <p id="returnButton" style="cursor: pointer">< image</p>
+        <table id="headerTable"></table>
       </div>
     </div>
 
@@ -114,8 +148,41 @@
       let originalDataT = null;
       let scaleFactor = 1;
 
-      function drawLineProfile(profileCtx, profileData, isHorizontal, offset) {
+      const mainContainer = document.querySelector(".mainContainer");
+      const headerTab = document.getElementById("headerTab");
+      const headerContainer = document.getElementById("headerContainer");
+      const gridContainer = document.querySelector(".grid-container");
+      const returnButton = document.getElementById("returnButton");
+      const headerTable = document.getElementById("headerTable");
 
+      let headerData = {};
+
+      headerTab.addEventListener("click", () => {
+        gridContainer.style.display = "none";
+        headerContainer.style.display = "block";
+        displayHeaderTable(headerData);
+      });
+
+      returnButton.addEventListener("click", () => {
+        headerContainer.style.display = "none";
+        gridContainer.style.display = "grid";
+      });
+
+      function displayHeaderTable(data) {
+        headerTable.innerHTML = "";
+        for (const [key, value] of Object.entries(data)) {
+          const row = document.createElement("tr");
+          const keyCell = document.createElement("td");
+          const valueCell = document.createElement("td");
+          keyCell.textContent = key;
+          valueCell.textContent = value;
+          row.appendChild(keyCell);
+          row.appendChild(valueCell);
+          headerTable.appendChild(row);
+        }
+      }
+
+      function drawLineProfile(profileCtx, profileData, isHorizontal, offset) {
         console.log(isHorizontal, offset);
         // set canvas size
         profileCtx.clearRect(
@@ -124,9 +191,17 @@
           profileCtx.canvas.width,
           profileCtx.canvas.height
         );
-        console.log("width, height", profileCtx.canvas.width, profileCtx.canvas.height);
+        console.log(
+          "width, height",
+          profileCtx.canvas.width,
+          profileCtx.canvas.height
+        );
         console.log("image width, height", imageWidth, imageHeight);
-        console.log("real width, height", (imageWidth / currentTransform.k), (imageHeight / currentTransform.k));
+        console.log(
+          "real width, height",
+          imageWidth / currentTransform.k,
+          imageHeight / currentTransform.k
+        );
         // Find max value for scaling
         const maxVal = Math.max(...profileData);
 
@@ -154,7 +229,8 @@
         if (isHorizontal) {
           profileData.forEach((val, index) => {
             const x =
-              ((index - offset) / (profileData.length - 1)) * profileCtx.canvas.width;
+              ((index - offset) / (profileData.length - 1)) *
+              profileCtx.canvas.width;
             const y = profileCtx.canvas.height * (1 - val / maxVal);
             if (index === 0) {
               profileCtx.moveTo(x, y);
@@ -170,7 +246,8 @@
           profileData.forEach((val, index) => {
             const x = profileCtx.canvas.width * (1 - val / maxVal);
             const y =
-              ((index - offset) / (profileData.length - 1)) * profileCtx.canvas.height;
+              ((index - offset) / (profileData.length - 1)) *
+              profileCtx.canvas.height;
             if (index === 0) {
               profileCtx.moveTo(x, y);
             } else {
@@ -188,8 +265,10 @@
         normalizedData,
         width,
         height,
-        originalPixelData
+        originalPixelData,
+        header
       ) {
+        headerData = header;
         imageWidth = width;
         imageHeight = height;
         originalData = originalPixelData;
@@ -239,81 +318,88 @@
         canvas.style.height = `${height * scaleFactor - 100}px`;
 
         spinner.style.display = "none";
-        canvas.style.display = "block";
-        xProfileCanvas.style.display = "block";
-        yProfileCanvas.style.display = "block";
+        mainContainer.style.display = "grid";
 
         xProfileCanvas.width = canvas.getBoundingClientRect().width;
         yProfileCanvas.height = canvas.getBoundingClientRect().height;
 
         // Add mousemove event listener to show pixel value and line profiles
         canvas.addEventListener("mousemove", (event) => {
-            handler(event, width, height);
+          handler(event, width, height);
         });
         canvas.addEventListener("wheel", (event) => {
-            handler(event, width, height);
+          handler(event, width, height);
         });
         canvas.addEventListener("pointermove", (event) => {
-            handler(event, width, height);
+          handler(event, width, height);
         });
       }
 
       function handler(event, width, height) {
         const rect = canvas.getBoundingClientRect();
-          const scaleX = canvas.width / rect.width;
-          const scaleY = canvas.height / rect.height;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
 
-          const x = Math.floor((event.clientX - rect.left) * scaleX);
-          const y = Math.floor((event.clientY - rect.top) * scaleY);
+        const x = Math.floor((event.clientX - rect.left) * scaleX);
+        const y = Math.floor((event.clientY - rect.top) * scaleY);
 
-          // Apply the current transform to get the actual pixel coordinates
-          const transformedX = Math.floor(
-            (x - currentTransform.x / scaleFactor) / currentTransform.k
+        // Apply the current transform to get the actual pixel coordinates
+        const transformedX = Math.floor(
+          (x - currentTransform.x / scaleFactor) / currentTransform.k
+        );
+        const transformedY = Math.floor(
+          (y - currentTransform.y / scaleFactor) / currentTransform.k
+        );
+
+        // current x width and y height in terms of pixels in the image
+        const xWidth = Math.ceil(imageWidth / currentTransform.k);
+        const yHeight = Math.ceil(imageHeight / currentTransform.k);
+
+        // left and top of the image in terms of pixels in the image
+        const left = Math.floor(
+          -currentTransform.x / scaleFactor / currentTransform.k
+        );
+        const top = Math.floor(
+          -currentTransform.y / scaleFactor / currentTransform.k
+        );
+
+        if (
+          transformedX >= 0 &&
+          transformedX < width &&
+          transformedY >= 0 &&
+          transformedY < height
+        ) {
+          // Extract X and Y line profiles of region shown in the canvas
+          const xProfile = originalData.slice(
+            transformedY * width + left,
+            transformedY * width + left + xWidth + 1
           );
-          const transformedY = Math.floor(
-            (y - currentTransform.y / scaleFactor) / currentTransform.k
+          const yProfile = originalDataT[transformedX].slice(
+            top,
+            top + yHeight + 1
           );
 
-          // current x width and y height in terms of pixels in the image
-          const xWidth = Math.ceil(imageWidth / currentTransform.k);
-          const yHeight = Math.ceil(imageHeight / currentTransform.k);
-
-          // left and top of the image in terms of pixels in the image
-          const left = Math.floor(
-            -currentTransform.x / scaleFactor / currentTransform.k
+          // Draw line profiles
+          drawLineProfile(
+            xProfileCtx,
+            xProfile,
+            true,
+            -currentTransform.x / scaleFactor / currentTransform.k - left
           );
-          const top = Math.floor(
-            -currentTransform.y / scaleFactor / currentTransform.k
+          drawLineProfile(
+            yProfileCtx,
+            yProfile,
+            false,
+            -currentTransform.y / scaleFactor / currentTransform.k - top
           );
 
-          if (
-            transformedX >= 0 &&
-            transformedX < width &&
-            transformedY >= 0 &&
-            transformedY < height
-          ) {
-            // Extract X and Y line profiles of region shown in the canvas
-            const xProfile = originalData.slice(
-              transformedY * width + left,
-              transformedY * width + left + xWidth + 1
-            );
-            const yProfile = originalDataT[transformedX].slice(
-              top,
-              top + yHeight + 1
-            );
-
-            // Draw line profiles
-            drawLineProfile(xProfileCtx, xProfile, true, (-currentTransform.x / scaleFactor / currentTransform.k - left));
-            drawLineProfile(yProfileCtx, yProfile, false, (-currentTransform.y / scaleFactor / currentTransform.k - top));
-
-            // Show pixel value
-            const pixelValue =
-              originalData[transformedY * width + transformedX];
-            document.getElementById("pixelValue").innerText = `${pixelValue}`;
-            document.getElementById(
-              "pixelPosition"
-            ).innerText = `${transformedX}, ${transformedY}`;
-          }
+          // Show pixel value
+          const pixelValue = originalData[transformedY * width + transformedX];
+          document.getElementById("pixelValue").innerText = `${pixelValue}`;
+          document.getElementById(
+            "pixelPosition"
+          ).innerText = `${transformedX}, ${transformedY}`;
+        }
       }
 
       function setupZoom() {
