@@ -4,25 +4,32 @@ html {
   display: flex;
   justify-content: center;
   /* align-items: center; */
-  height: 100%; /* Ensure body takes full viewport height */
+  height: 100%;
+  /* Ensure body takes full viewport height */
   font-family: Arial, sans-serif;
 }
+
 #mainContainer {
   display: flex;
   /* align-items: stretch; */
-  width: 100%; /* Ensure main container takes full width */
-  height: 100%; /* Ensure main container takes full height */
+  width: 100%;
+  /* Ensure main container takes full width */
+  height: 100%;
+  /* Ensure main container takes full height */
 }
+
 #imageContainer {
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
 }
+
 #loadedImage {
   max-width: 100%;
   max-height: 100%;
 }
+
 #lineProfiles {
   display: flex;
   flex-direction: column;
@@ -37,14 +44,17 @@ html {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+
 @keyframes spin {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
 }
+
 canvas {
   image-rendering: optimizeSpeed;
   image-rendering: -moz-crisp-edges;
@@ -53,16 +63,30 @@ canvas {
   image-rendering: crisp-edges;
   -ms-interpolation-mode: nearest-neighbor;
 }
+
 .grid-container {
+  position: relative;
   height: 100%;
   display: grid;
   grid-template-columns: auto 100px;
   grid-template-rows: auto 100px;
-  flex-grow: 1; /* added */
-  min-height: 0; /* here */
+  flex-grow: 1;
+  min-height: 0;
 }
-.header-container {
-  display: none;
+
+.overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  text-align: right;
+  font-weight: 200;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  opacity: 0.5;
+}
+
+.toggle-button {
+  cursor: pointer;
+  user-select: none;
 }
 
 table {
@@ -78,4 +102,20 @@ td {
 
 tr:hover {
   background-color: #f5f5f523;
+}
+
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  overflow-y: scroll;
+}
+
+.info-corner {
+    text-align: right;
+    padding-top: 10px;
+    font-weight: 200;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    opacity: 0.5;
 }

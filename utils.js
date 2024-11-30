@@ -178,3 +178,11 @@ function medianValue(arr) {
         ? sorted[mid]
         : (sorted[mid - 1] + sorted[mid]) / 2;
 }
+
+function formatNumber(num, precision) {
+    if(Math.floor(num) === num) {
+      return num; // return as is, when it's an integer
+    } else {
+      return num.toFixed(precision); // use toFixed when there are decimals
+    }
+  }

@@ -8,43 +8,31 @@
   </head>
   <body>
     <div style="display: flex; align-items: center; height: 100%">
-      <div id="spinner"></div>
+        <div id="spinner"></div>
     </div>
     <div class="mainContainer" style="display: none">
-      <div class="grid-container">
-        <canvas id="loadedImage"></canvas>
-        <canvas id="yProfile" width="100"></canvas>
-        <canvas id="xProfile" height="100"></canvas>
-        <div
-          id="cursor"
-          style="
-            text-align: right;
-            padding-top: 10px;
-            font-weight: 200;
-            font-family: Verdana, Geneva, Tahoma, sans-serif;
-            opacity: 0.5;
-          "
-        >
-          <p id="pixelValue"></p>
-          <p id="pixelPosition"></p>
-          <p id="headerTab" style="cursor: pointer">header ></p>
+        <div id="imageGridContainer" class="grid-container">
+            <canvas id="loadedImage"></canvas>
+            <canvas id="yProfile" width="100"></canvas>
+            <canvas id="xProfile" height="100"></canvas>
+            <div class="info-corner">
+                <p id="headerTab" class="toggle-button">header &gt;</p>
+                <p id="pixelValue"></p>
+                <p id="pixelPosition"></p>
+            </div>
         </div>
-      </div>
-      <div
-        class="header-container"
-        id="headerContainer"
-        style="
-          text-align: left;
-          padding-top: 10px;
-          font-weight: 200;
-          font-family: Verdana, Geneva, Tahoma, sans-serif;
-          opacity: 0.5;
-        "
-      >
-        <p id="returnButton" style="cursor: pointer">< image</p>
-        <table id="headerTable"></table>
-      </div>
+        <div id="headerGridContainer" class="grid-container" style="display: none;">
+            <div class="header-container">
+                <table id="headerTable"></table>
+            </div>
+            <div></div>
+            <div></div>
+            <div class="info-corner">
+                <p id="returnButton" class="toggle-button">&lt; image</p>
+            </div>
+        </div>
     </div>
+
 
     <script>
       const vscode = acquireVsCodeApi();
@@ -69,20 +57,19 @@
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
-      const headerContainer = document.getElementById("headerContainer");
-      const gridContainer = document.querySelector(".grid-container");
+      const headerGridContainer = document.getElementById("headerGridContainer");
+      const imageGridContainer = document.getElementById("imageGridContainer");
       const returnButton = document.getElementById("returnButton");
       const headerTable = document.getElementById("headerTable");
 
       headerTab.addEventListener("click", () => {
-        gridContainer.style.display = "none";
-        headerContainer.style.display = "block";
-        displayHeaderTable(headerData);
+        imageGridContainer.style.display = "none";
+        headerGridContainer.style.display = "grid";
       });
 
       returnButton.addEventListener("click", () => {
-        headerContainer.style.display = "none";
-        gridContainer.style.display = "grid";
+        headerGridContainer.style.display = "none";
+        imageGridContainer.style.display = "grid";
       });
 
       function displayHeaderTable(data) {
@@ -182,6 +169,8 @@
         [headerData, normalizedData, imageWidth, imageHeight, imageData] =
           parseFITSImage(arrayBuffer, dataView);
 
+        displayHeaderTable(headerData);
+
         console.timeLog("renderMonochromeImage", "FITS header and data parsed");
 
         // Step 4: Precompute the transposed data for vertical profiles
@@ -240,6 +229,9 @@
 
         xProfileCanvas.width = canvas.getBoundingClientRect().width;
         yProfileCanvas.height = canvas.getBoundingClientRect().height;
+
+        // set width of header-container to match the canvas width
+        document.querySelector(".header-container").style.width = `${canvas.getBoundingClientRect().width}px`;
 
         // Add mousemove event listener to show pixel value and line profiles
         canvas.addEventListener("mousemove", (event) => {
@@ -314,7 +306,7 @@
           );
 
           // Show pixel value
-          const pixelValue = imageData[transformedY * width + transformedX];
+          const pixelValue = formatNumber(imageData[transformedY * width + transformedX], 2);
           document.getElementById("pixelValue").innerText = `${pixelValue}`;
           document.getElementById(
             "pixelPosition"
