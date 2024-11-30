@@ -2,7 +2,7 @@
 
 A simple Visual Studio Code extension for viewing FITS (Flexible Image Transport System) files directly within the editor.
 
-<img src="demo.gif" alt="simple-fits-viewer in action" style="width:100%; height:auto;">
+<img src="demo.gif" alt="simple-fits-viewer in action" width=100%>
 
 ## Features 🎉
 
