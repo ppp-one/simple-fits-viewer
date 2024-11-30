@@ -180,9 +180,9 @@ function medianValue(arr) {
 }
 
 function formatNumber(num, precision) {
-    if(Math.floor(num) === num) {
-      return num; // return as is, when it's an integer
+    if (Math.floor(num) === num) {
+        return num; // return as is, when it's an integer
     } else {
-      return num.toFixed(precision); // use toFixed when there are decimals
+        return num.toFixed(precision); // use toFixed when there are decimals
     }
-  }
+}

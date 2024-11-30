@@ -8,33 +8,72 @@
   </head>
   <body>
     <div style="display: flex; align-items: center; height: 100%">
-        <div id="spinner"></div>
+      <div id="spinner"></div>
     </div>
     <div class="mainContainer" style="display: none">
-        <div id="imageGridContainer" class="grid-container">
-            <canvas id="loadedImage"></canvas>
-            <canvas id="yProfile" width="100"></canvas>
-            <canvas id="xProfile" height="100"></canvas>
-            <div class="info-corner">
-                <p id="headerTab" class="toggle-button">header &gt;</p>
-                <p id="pixelValue"></p>
-                <p id="pixelPosition"></p>
-            </div>
+      <div id="imageGridContainer" class="grid-container">
+        <canvas id="loadedImage"></canvas>
+        <canvas id="yProfile" width="100"></canvas>
+        <canvas id="xProfile" height="100"></canvas>
+        <div class="info-corner">
+          <p id="headerTab" class="toggle-button">header &gt;</p>
+          <p id="pixelValue"></p>
+          <p id="pixelPosition"></p>
         </div>
-        <div id="headerGridContainer" class="grid-container" style="display: none;">
-            <div class="header-container">
-                <table id="headerTable"></table>
+      </div>
+      <div
+        id="headerGridContainer"
+        class="grid-container"
+        style="display: none"
+      >
+        <div class="header-container">
+          <div class="search-controls">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search headers..."
+            />
+            <div id="resetButton" title="reset search">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="1.5"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                />
+              </svg>
             </div>
-            <div></div>
-            <div style="display: flex; align-items: flex-end; justify-content: center; height: 100%;">            
-                <p style="font-size: 12px; opacity: 0.2;">Made with ❤️ by <a href="https://www.ppp.one/" style="text-decoration-line: underline;">Peter Pihlmann Pedersen</a></p>
-            </div>
-            <div class="info-corner">
-                <p id="returnButton" class="toggle-button">&lt; image</p>
-            </div>
+          </div>
+          <table id="headerTable"></table>
         </div>
+        <div></div>
+        <div
+          style="
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            height: 100%;
+          "
+        >
+          <p style="font-size: 12px; opacity: 0.25">
+            Made with ❤️ by
+            <a
+              href="https://www.ppp.one/"
+              style="text-decoration-line: underline"
+              >Peter Pihlmann Pedersen</a
+            >
+          </p>
+        </div>
+        <div class="info-corner">
+          <p id="returnButton" class="toggle-button">&lt; image</p>
+        </div>
+      </div>
     </div>
-
 
     <script>
       const vscode = acquireVsCodeApi();
@@ -59,10 +98,14 @@
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
-      const headerGridContainer = document.getElementById("headerGridContainer");
+      const headerGridContainer = document.getElementById(
+        "headerGridContainer"
+      );
       const imageGridContainer = document.getElementById("imageGridContainer");
       const returnButton = document.getElementById("returnButton");
       const headerTable = document.getElementById("headerTable");
+      const searchInput = document.getElementById("searchInput");
+      const resetButton = document.getElementById("resetButton");
 
       headerTab.addEventListener("click", () => {
         imageGridContainer.style.display = "none";
@@ -74,16 +117,49 @@
         imageGridContainer.style.display = "grid";
       });
 
+      searchInput.addEventListener("input", () => {
+        const query = searchInput.value.toLowerCase();
+        const filteredData = Object.fromEntries(
+          Object.entries(headerData).filter(
+            ([key, value]) =>
+              key.toLowerCase().includes(query) ||
+              value.toLowerCase().includes(query)
+          )
+        );
+        displayHeaderTable(filteredData);
+      });
+
+      resetButton.addEventListener("click", () => {
+        searchInput.value = "";
+        displayHeaderTable(headerData);
+      });
+
       function displayHeaderTable(data) {
         headerTable.innerHTML = "";
+        // table header
+        const headerRow = document.createElement("tr");
+        const keyHeader = document.createElement("th");
+        const valueHeader = document.createElement("th");
+        const commentHeader = document.createElement("th");
+        keyHeader.textContent = "Key";
+        valueHeader.textContent = "Value";
+        commentHeader.textContent = "Comment";
+        headerRow.appendChild(keyHeader);
+        headerRow.appendChild(valueHeader);
+        headerRow.appendChild(commentHeader);
+        headerTable.appendChild(headerRow);
+
         for (const [key, value] of Object.entries(data)) {
           const row = document.createElement("tr");
           const keyCell = document.createElement("td");
           const valueCell = document.createElement("td");
+          const commentCell = document.createElement("td");
           keyCell.textContent = key;
-          valueCell.textContent = value;
+          valueCell.textContent = value.split("/")[0];
+          commentCell.textContent = value.split("/")[1];
           row.appendChild(keyCell);
           row.appendChild(valueCell);
+          row.appendChild(commentCell);
           headerTable.appendChild(row);
         }
       }
@@ -233,7 +309,9 @@
         yProfileCanvas.height = canvas.getBoundingClientRect().height;
 
         // set width of header-container to match the canvas width
-        document.querySelector(".header-container").style.width = `${canvas.getBoundingClientRect().width}px`;
+        document.querySelector(".header-container").style.width = `${
+          canvas.getBoundingClientRect().width
+        }px`;
 
         // Add mousemove event listener to show pixel value and line profiles
         canvas.addEventListener("mousemove", (event) => {
@@ -308,7 +386,10 @@
           );
 
           // Show pixel value
-          const pixelValue = formatNumber(imageData[transformedY * width + transformedX], 2);
+          const pixelValue = formatNumber(
+            imageData[transformedY * width + transformedX],
+            2
+          );
           document.getElementById("pixelValue").innerText = `${pixelValue}`;
           document.getElementById(
             "pixelPosition"
