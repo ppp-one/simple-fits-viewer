@@ -1,41 +1,71 @@
 {
-  "name": "simple-fits-viewer",
-  "displayName": "Simple FITS viewer",
-  "description": "Preview FITS images in VSCode.",
-  "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.95.0"
-  },
-  "main": "extension.js",
-  "activationEvents": [
-      "onCustomEditor:fitFileViewer"
-  ],
-  "contributes": {
-      "customEditors": [
-          {
-              "viewType": "fitFileViewer",
-              "displayName": "FITS File Viewer",
-              "selector": [
-                  {
-                      "filenamePattern": "*.fit",
-                      "priority": "default"
-                  },
-                  {
-                      "filenamePattern": "*.fits",
-                      "priority": "default"
-                  }
-              ]
-          }
-      ]
-  },
-  "scripts": {
-      "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-      "fits",
-      "astronomy",
-      "file viewer"
-  ],
-  "author": "Your Name",
-  "license": "MIT"
+    "name": "simple-fits-viewer",
+    "displayName": "Simple FITS viewer",
+    "description": "Preview FITS images in VSCode.",
+    "version": "0.0.1",
+    "publisher": "",
+    "author": "@ppp-one",
+    "homepage": "https://github.com/ppp-one/simple-fits-viewer",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ppp-one/simple-fits-viewer.git"
+    },
+    "bugs": {
+        "url": "https://github.com/ppp-one/simple-fits-viewer/issues"
+    },
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "keywords": [
+        "fits",
+        "astronomy",
+        "file viewer",
+        "ds9",
+        "astronomy image viewer",
+        "fits viewer",
+        "fits image viewer",
+        "fits file viewer",
+        "fits preview",
+        "fits image preview",
+        "fits file preview",
+        "fits image previewer",
+        "fit viewer",
+        "fit image viewer",
+        "fit file viewer",
+        "fit preview",
+        "fit image preview",
+        "fit file preview",
+        "fit image previewer"
+    ],
+    "categories": [
+        "Visualization", "Other"
+    ],
+    "icon": "icon.png",
+    "main": "extension.js",
+    "activationEvents": [
+        "onCustomEditor:fitFileViewer"
+    ],
+    "contributes": {
+        "customEditors": [
+            {
+                "viewType": "fitFileViewer",
+                "displayName": "FITS File Viewer",
+                "selector": [
+                    {
+                        "filenamePattern": "*.fit",
+                        "priority": "default"
+                    },
+                    {
+                        "filenamePattern": "*.fits",
+                        "priority": "default"
+                    }
+                ]
+            }
+        ]
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+
+    "license": "MIT"
 }

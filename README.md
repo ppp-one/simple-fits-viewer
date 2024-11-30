@@ -1,65 +1,34 @@
-# simple-fits-viewer README
+# simple-fits-viewer
 
-This is the README for your extension "simple-fits-viewer". After writing up a brief description, we recommend including the following sections.
+A simple Visual Studio Code extension for viewing FITS (Flexible Image Transport System) files directly within the editor.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **View FITS Images:** Easily open and view FITS files in Visual Studio Code.
+- **Zoom & Pan:** Navigate FITS images with intuitive zoom and pan controls.
+- **Header Display:** Access detailed the headers associated with each FITS file.
+- **Interactive Line Profiles:** View and analyze line profiles of FITS images.
 
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+![simple-fits-viewer in action](demo.gif)
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- Visual Studio Code
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+None
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+See the [issues](http://github.com/ppp-one/simple-fits-viewer/issues) page for known issues.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+Initial release of simple-fits-viewer.
 
 ---
 
-## Working with Markdown
-
-You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+**Enjoy using simple-fits-viewer!**
