@@ -79,6 +79,19 @@
         <canvas id="loadedImage" style="display: none"></canvas>
         <canvas id="yProfile" style="display: none" width="100"></canvas>
         <canvas id="xProfile" style="display: none" height="100"></canvas>
+        <div
+          id="cursor"
+          style="
+            text-align: right;
+            padding-top: 10px;
+            font-weight: 200;
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            opacity: 0.5;
+          "
+        >
+          <p id="pixelValue"></p>
+          <p id="pixelPosition"></p>
+        </div>
       </div>
     </div>
 
@@ -101,7 +114,9 @@
       let originalDataT = null;
       let scaleFactor = 1;
 
-      function drawLineProfile(profileCtx, profileData, isHorizontal) {
+      function drawLineProfile(profileCtx, profileData, isHorizontal, offset) {
+
+        console.log(isHorizontal, offset);
         // set canvas size
         profileCtx.clearRect(
           0,
@@ -109,7 +124,9 @@
           profileCtx.canvas.width,
           profileCtx.canvas.height
         );
-
+        console.log("width, height", profileCtx.canvas.width, profileCtx.canvas.height);
+        console.log("image width, height", imageWidth, imageHeight);
+        console.log("real width, height", (imageWidth / currentTransform.k), (imageHeight / currentTransform.k));
         // Find max value for scaling
         const maxVal = Math.max(...profileData);
 
@@ -137,14 +154,11 @@
         if (isHorizontal) {
           profileData.forEach((val, index) => {
             const x =
-              (index / (profileData.length - 1)) * profileCtx.canvas.width;
+              ((index - offset) / (profileData.length - 1)) * profileCtx.canvas.width;
             const y = profileCtx.canvas.height * (1 - val / maxVal);
             if (index === 0) {
               profileCtx.moveTo(x, y);
             } else {
-              const prevX =
-                ((index - 1) / (profileData.length - 1)) *
-                profileCtx.canvas.width;
               const prevY =
                 profileCtx.canvas.height *
                 (1 - profileData[index - 1] / maxVal);
@@ -156,15 +170,12 @@
           profileData.forEach((val, index) => {
             const x = profileCtx.canvas.width * (1 - val / maxVal);
             const y =
-              (index / (profileData.length - 1)) * profileCtx.canvas.height;
+              ((index - offset) / (profileData.length - 1)) * profileCtx.canvas.height;
             if (index === 0) {
               profileCtx.moveTo(x, y);
             } else {
               const prevX =
                 profileCtx.canvas.width * (1 - profileData[index - 1] / maxVal);
-              const prevY =
-                ((index - 1) / (profileData.length - 1)) *
-                profileCtx.canvas.height;
               profileCtx.lineTo(prevX, y);
               profileCtx.lineTo(x, y);
             }
@@ -207,7 +218,7 @@
 
         canvas.width = width;
         canvas.height = height;
-        
+
         offscreenCanvas = document.createElement("canvas");
         offscreenCanvas.width = width;
         offscreenCanvas.height = height;
@@ -237,7 +248,18 @@
 
         // Add mousemove event listener to show pixel value and line profiles
         canvas.addEventListener("mousemove", (event) => {
-          const rect = canvas.getBoundingClientRect();
+            handler(event, width, height);
+        });
+        canvas.addEventListener("wheel", (event) => {
+            handler(event, width, height);
+        });
+        canvas.addEventListener("pointermove", (event) => {
+            handler(event, width, height);
+        });
+      }
+
+      function handler(event, width, height) {
+        const rect = canvas.getBoundingClientRect();
           const scaleX = canvas.width / rect.width;
           const scaleY = canvas.height / rect.height;
 
@@ -246,19 +268,23 @@
 
           // Apply the current transform to get the actual pixel coordinates
           const transformedX = Math.floor(
-            (x - currentTransform.x/scaleFactor) / currentTransform.k
+            (x - currentTransform.x / scaleFactor) / currentTransform.k
           );
           const transformedY = Math.floor(
-            (y - currentTransform.y/scaleFactor) / currentTransform.k
+            (y - currentTransform.y / scaleFactor) / currentTransform.k
           );
 
           // current x width and y height in terms of pixels in the image
-          const xWidth = Math.floor(imageWidth / currentTransform.k);
-          const yHeight = Math.floor(imageHeight / currentTransform.k);
+          const xWidth = Math.ceil(imageWidth / currentTransform.k);
+          const yHeight = Math.ceil(imageHeight / currentTransform.k);
 
           // left and top of the image in terms of pixels in the image
-          const left = Math.floor(-currentTransform.x/scaleFactor / currentTransform.k);
-          const top = Math.floor(-currentTransform.y/scaleFactor / currentTransform.k);
+          const left = Math.floor(
+            -currentTransform.x / scaleFactor / currentTransform.k
+          );
+          const top = Math.floor(
+            -currentTransform.y / scaleFactor / currentTransform.k
+          );
 
           if (
             transformedX >= 0 &&
@@ -269,26 +295,25 @@
             // Extract X and Y line profiles of region shown in the canvas
             const xProfile = originalData.slice(
               transformedY * width + left,
-              transformedY * width + left + xWidth + 2
+              transformedY * width + left + xWidth + 1
             );
             const yProfile = originalDataT[transformedX].slice(
               top,
-              top + yHeight + 2
+              top + yHeight + 1
             );
 
             // Draw line profiles
-            drawLineProfile(xProfileCtx, xProfile, true);
-            drawLineProfile(yProfileCtx, yProfile, false);
+            drawLineProfile(xProfileCtx, xProfile, true, (-currentTransform.x / scaleFactor / currentTransform.k - left));
+            drawLineProfile(yProfileCtx, yProfile, false, (-currentTransform.y / scaleFactor / currentTransform.k - top));
 
-            console.log(
-              "Pixel value:",
-              originalData[transformedY * width + transformedX],
-              "at:",
-              transformedX,
-              transformedY
-            );
+            // Show pixel value
+            const pixelValue =
+              originalData[transformedY * width + transformedX];
+            document.getElementById("pixelValue").innerText = `${pixelValue}`;
+            document.getElementById(
+              "pixelPosition"
+            ).innerText = `${transformedX}, ${transformedY}`;
           }
-        });
       }
 
       function setupZoom() {
@@ -301,15 +326,33 @@
             currentTransform = transform;
 
             // Constrain translation to prevent panning out of canvas
-            const maxX = Math.max(0, (canvas.width - imageWidth * transform.k) / 2);
-            const maxY = Math.max(0, (canvas.height - imageHeight * transform.k) / 2);
-            transform.x = Math.min(maxX, Math.max(transform.x, canvas.width - imageWidth * transform.k - maxX));
-            transform.y = Math.min(maxY, Math.max(transform.y, canvas.height - imageHeight * transform.k - maxY));
+            const maxX = Math.max(
+              0,
+              (canvas.width - imageWidth * transform.k) / 2
+            );
+            const maxY = Math.max(
+              0,
+              (canvas.height - imageHeight * transform.k) / 2
+            );
+            transform.x = Math.min(
+              maxX,
+              Math.max(
+                transform.x,
+                canvas.width - imageWidth * transform.k - maxX
+              )
+            );
+            transform.y = Math.min(
+              maxY,
+              Math.max(
+                transform.y,
+                canvas.height - imageHeight * transform.k - maxY
+              )
+            );
 
             // Compute visible canvas size and resample from the original resolution
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
-            ctx.translate(transform.x/scaleFactor, transform.y/scaleFactor);
+            ctx.translate(transform.x / scaleFactor, transform.y / scaleFactor);
             ctx.scale(transform.k, transform.k);
 
             // Redraw the original image with the appropriate transformation
