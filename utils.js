@@ -4,22 +4,22 @@ function parseFITSImage(arrayBuffer, dataView) {
     let offset = 0;
     const headerSize = 2880;
     while (true) {
-      const block = new TextDecoder().decode(
-        arrayBuffer.slice(offset, offset + headerSize)
-      );
-      headerText += block;
-      offset += headerSize;
-      if (block.trim().endsWith("END")) break;
+        const block = new TextDecoder().decode(
+            arrayBuffer.slice(offset, offset + headerSize)
+        );
+        headerText += block;
+        offset += headerSize;
+        if (block.trim().endsWith("END")) break;
     }
 
     // Parse Header Keywords
     const headerLines = headerText.match(/.{1,80}/g); // Split into 80-char lines
     const header = {};
     for (const line of headerLines) {
-      const keyword = line.substring(0, 8).trim();
-      const value = line.substring(10, 80).trim();
-      if (keyword === "END") break;
-      header[keyword] = value;
+        const keyword = line.substring(0, 8).trim();
+        const value = line.substring(10, 80).trim();
+        if (keyword === "END") break;
+        header[keyword] = value;
     }
 
     const width = parseInt(header["NAXIS1"], 10);
@@ -34,33 +34,33 @@ function parseFITSImage(arrayBuffer, dataView) {
     const data = [];
 
     for (let i = 0; i < dataSize; i++) {
-      let pixelValue;
+        let pixelValue;
 
-      if (bitpix === 16) {
-        pixelValue = dataView.getInt16(offset, false); // 16-bit signed integer
-      } else if (bitpix === 32) {
-        pixelValue = dataView.getInt32(offset, false); // 32-bit signed integer
-      } else if (bitpix === -32) {
-        pixelValue = dataView.getFloat32(offset, false); // 32-bit float
-      } else if (bitpix === -64) {
-        pixelValue = dataView.getFloat64(offset, false); // 64-bit float
-      } else {
-        throw new Error(`Unsupported BITPIX: ${bitpix}`);
-      }
+        if (bitpix === 16) {
+            pixelValue = dataView.getInt16(offset, false); // 16-bit signed integer
+        } else if (bitpix === 32) {
+            pixelValue = dataView.getInt32(offset, false); // 32-bit signed integer
+        } else if (bitpix === -32) {
+            pixelValue = dataView.getFloat32(offset, false); // 32-bit float
+        } else if (bitpix === -64) {
+            pixelValue = dataView.getFloat64(offset, false); // 64-bit float
+        } else {
+            throw new Error(`Unsupported BITPIX: ${bitpix}`);
+        }
 
-      offset += bytesPerPixel;
-      data.push(pixelValue * bscale + bzero); // Apply scaling
+        offset += bytesPerPixel;
+        data.push(pixelValue * bscale + bzero); // Apply scaling
     }
 
     // Normalize Data for Display
     const { vmin, vmax } = zscale(data);
     const normalizedData = data.map(
-      (value) => ((value - vmin) / (vmax - vmin)) * 255
+        (value) => ((value - vmin) / (vmax - vmin)) * 255
     );
 
     // console.log(header, normalizedData);
     return [header, normalizedData, width, height, data];
-  }
+}
 
 
 function zscale(
@@ -71,13 +71,13 @@ function zscale(
     min_npixels = 5,
     krej = 2.5,
     max_iterations = 5
-  ) {
+) {
     // Sample the image
     values = values.filter((v) => isFinite(v));
     const stride = Math.max(1, Math.floor(values.length / n_samples));
     let samples = values
-      .filter((_, index) => index % stride === 0)
-      .slice(0, n_samples);
+        .filter((_, index) => index % stride === 0)
+        .slice(0, n_samples);
     samples.sort((a, b) => a - b);
 
     const npix = samples.length;
@@ -100,43 +100,43 @@ function zscale(
     let fit = { slope: 0, intercept: 0 };
 
     for (let iter = 0; iter < max_iterations; iter++) {
-      if (ngoodpix >= last_ngoodpix || ngoodpix < minpix) break;
+        if (ngoodpix >= last_ngoodpix || ngoodpix < minpix) break;
 
-      fit = linearFit(x, samples, badpix);
-      const fitted = x.map((xi) => fit.slope * xi + fit.intercept);
+        fit = linearFit(x, samples, badpix);
+        const fitted = x.map((xi) => fit.slope * xi + fit.intercept);
 
-      // Subtract fitted line from the data array
-      const flat = samples.map((s, i) => s - fitted[i]);
+        // Subtract fitted line from the data array
+        const flat = samples.map((s, i) => s - fitted[i]);
 
-      // Compute the k-sigma rejection threshold
-      const threshold = krej * std(flat.filter((_, i) => !badpix[i]));
+        // Compute the k-sigma rejection threshold
+        const threshold = krej * std(flat.filter((_, i) => !badpix[i]));
 
-      // Detect and reject pixels further than k*sigma from the fitted line
-      badpix = flat.map((f) => Math.abs(f) > threshold);
+        // Detect and reject pixels further than k*sigma from the fitted line
+        badpix = flat.map((f) => Math.abs(f) > threshold);
 
-      // Convolve with a kernel of length ngrow
-      badpix = convolve(badpix, kernel);
+        // Convolve with a kernel of length ngrow
+        badpix = convolve(badpix, kernel);
 
-      last_ngoodpix = ngoodpix;
-      ngoodpix = badpix.filter((b) => !b).length;
+        last_ngoodpix = ngoodpix;
+        ngoodpix = badpix.filter((b) => !b).length;
     }
 
     if (ngoodpix >= minpix) {
-      let slope = fit.slope;
+        let slope = fit.slope;
 
-      if (contrast > 0) {
-        slope = slope / contrast;
-      }
-      const center_pixel = Math.floor((npix - 1) / 2);
-      const median = medianValue(samples);
-      vmin = Math.max(vmin, median - (center_pixel - 1) * slope);
-      vmax = Math.min(vmax, median + (npix - center_pixel) * slope);
+        if (contrast > 0) {
+            slope = slope / contrast;
+        }
+        const center_pixel = Math.floor((npix - 1) / 2);
+        const median = medianValue(samples);
+        vmin = Math.max(vmin, median - (center_pixel - 1) * slope);
+        vmax = Math.min(vmax, median + (npix - center_pixel) * slope);
     }
 
     return { vmin, vmax };
-  }
+}
 
-  function linearFit(x, y, badpix) {
+function linearFit(x, y, badpix) {
     const goodIndices = x.filter((_, i) => !badpix[i]);
     const goodX = goodIndices.map((i) => x[i]);
     const goodY = goodIndices.map((i) => y[i]);
@@ -148,33 +148,33 @@ function zscale(
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
     const intercept = (sumY - slope * sumX) / n;
     return { slope, intercept };
-  }
+}
 
-  function std(arr) {
+function std(arr) {
     const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
     return Math.sqrt(
-      arr.reduce((sum, val) => sum + (val - mean) ** 2, 0) / arr.length
+        arr.reduce((sum, val) => sum + (val - mean) ** 2, 0) / arr.length
     );
-  }
+}
 
-  function convolve(arr, kernel) {
+function convolve(arr, kernel) {
     const result = new Array(arr.length).fill(false);
     for (let i = 0; i < arr.length; i++) {
-      if (arr[i]) {
-        for (let j = 0; j < kernel.length; j++) {
-          if (i + j < arr.length) {
-            result[i + j] = true;
-          }
+        if (arr[i]) {
+            for (let j = 0; j < kernel.length; j++) {
+                if (i + j < arr.length) {
+                    result[i + j] = true;
+                }
+            }
         }
-      }
     }
     return result;
-  }
+}
 
-  function medianValue(arr) {
+function medianValue(arr) {
     const sorted = arr.slice().sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     return sorted.length % 2 !== 0
-      ? sorted[mid]
-      : (sorted[mid - 1] + sorted[mid]) / 2;
-  }
+        ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
+}

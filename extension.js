@@ -3,44 +3,44 @@ const fs = require('fs');
 const path = require('path');
 
 function activate(context) {
-	console.log("Extension 'simple-fits-viewer' is now active!");
+    console.log("Extension 'simple-fits-viewer' is now active!");
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider('fitFileViewer', new FITSFileEditor(context))
     );
 }
 
 class FITSFileEditor {
-	constructor(context) {
+    constructor(context) {
         this.context = context;
     }
-	
+
     async resolveCustomTextEditor(document, webviewPanel, token) {
 
         // Set up the webview content
         webviewPanel.webview.options = {
             enableScripts: true,
-			localResourceRoots: [
-				vscode.Uri.file(path.dirname(document.uri.fsPath))
-			  ]
+            localResourceRoots: [
+                vscode.Uri.file(path.dirname(document.uri.fsPath))
+            ]
         };
 
         // Function to update webview content
         const updateWebview = () => {
             try {
-				// Step 1: Update the webview content
-				webviewPanel.webview.html = this.getWebviewContent();
+                // Step 1: Update the webview content
+                webviewPanel.webview.html = this.getWebviewContent();
 
-				// Step 2: Send data to webview (SLOW?)
+                // Step 2: Send data to webview (SLOW?)
                 webviewPanel.webview.onDidReceiveMessage(
-					message => {
+                    message => {
                         if (message.command === 'ready') {
-							// Convert the document URI to a webview URI
-							const fitsFileUri = webviewPanel.webview.asWebviewUri(document.uri);
-							
-							// Send the data to the webview
+                            // Convert the document URI to a webview URI
+                            const fitsFileUri = webviewPanel.webview.asWebviewUri(document.uri);
+
+                            // Send the data to the webview
                             webviewPanel.webview.postMessage({
                                 command: 'loadData',
-								fileUri: fitsFileUri.toString()
+                                fileUri: fitsFileUri.toString()
                             });
                         }
                     },
@@ -49,7 +49,7 @@ class FITSFileEditor {
                 );
 
             } catch (error) {
-				console.log(error);
+                console.log(error);
                 vscode.window.showErrorMessage(`Error reading FITS file: ${error.message}`);
             }
         };
@@ -71,26 +71,26 @@ class FITSFileEditor {
     }
 
     getWebviewContent() {
-		const filePath = path.join(__dirname, 'webview.html');
-		let content = fs.readFileSync(filePath, 'utf8');
+        const filePath = path.join(__dirname, 'webview.html');
+        let content = fs.readFileSync(filePath, 'utf8');
 
-		// Attach utils.js
-		const utilsPath = path.join(__dirname, 'utils.js');
-		const utilsContent = fs.readFileSync(utilsPath, 'utf8');
+        // Attach utils.js
+        const utilsPath = path.join(__dirname, 'utils.js');
+        const utilsContent = fs.readFileSync(utilsPath, 'utf8');
 
-		// Attach styles.css
-		const stylePath = path.join(__dirname, 'style.css');
-		const styleContent = fs.readFileSync(stylePath, 'utf8');
+        // Attach styles.css
+        const stylePath = path.join(__dirname, 'style.css');
+        const styleContent = fs.readFileSync(stylePath, 'utf8');
 
-		// Inject utils.js and styles.css content into the webview HTML
-		content = content.replace('</body>', `<script>${utilsContent}</script><style>${styleContent}</style></body>`);
+        // Inject utils.js and styles.css content into the webview HTML
+        content = content.replace('</body>', `<script>${utilsContent}</script><style>${styleContent}</style></body>`);
         return content;
     }
 }
 
 exports.activate = activate;
 
-function deactivate() {}
+function deactivate() { }
 
 module.exports = {
     activate,
