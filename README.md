@@ -2,6 +2,8 @@
 
 A simple Visual Studio Code extension for viewing FITS (Flexible Image Transport System) files directly within the editor.
 
+🔗 Download here: [simple-fits-viewer](https://marketplace.visualstudio.com/items?itemName=ppp-one.simple-fits-viewer)
+
 <img src="demo.gif" alt="simple-fits-viewer in action" width=100%>
 
 ## Features 🎉
