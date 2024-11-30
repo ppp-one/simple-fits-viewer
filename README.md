@@ -28,7 +28,3 @@ See the [issues](http://github.com/ppp-one/simple-fits-viewer/issues) page for k
 ### 0.0.1
 
 Initial release of simple-fits-viewer.
-
----
-
-**Enjoy using simple-fits-viewer!**
