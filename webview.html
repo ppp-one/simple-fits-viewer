@@ -5,89 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Monochrome Image Viewer with Line Profiles</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <style>
-      body,
-      html {
-        margin: 0;
-        display: flex;
-        justify-content: center;
-        /* align-items: center; */
-        height: 100%; /* Ensure body takes full viewport height */
-        font-family: Arial, sans-serif;
-      }
-      #mainContainer {
-        display: flex;
-        /* align-items: stretch; */
-        width: 100%; /* Ensure main container takes full width */
-        height: 100%; /* Ensure main container takes full height */
-      }
-      #imageContainer {
-        position: relative;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      #loadedImage {
-        max-width: 100%;
-        max-height: 100%;
-      }
-      #lineProfiles {
-        display: flex;
-        flex-direction: column;
-      }
 
-      #spinner {
-        position: absolute;
-        width: 50px;
-        height: 50px;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #3498db;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-      canvas {
-        image-rendering: optimizeSpeed;
-        image-rendering: -moz-crisp-edges;
-        image-rendering: -webkit-optimize-contrast;
-        image-rendering: -o-crisp-edges;
-        image-rendering: crisp-edges;
-        -ms-interpolation-mode: nearest-neighbor;
-      }
-      .grid-container {
-        height: 100%;
-        display: grid;
-        grid-template-columns: auto 100px;
-        grid-template-rows: auto 100px;
-        flex-grow: 1; /* added */
-        min-height: 0; /* here */
-      }
-      .header-container {
-        display: none;
-      }
-
-      table {
-        border-collapse: collapse;
-        width: 100%;
-      }
-
-      th,
-      td {
-        text-align: left;
-        padding: 2px 16px;
-      }
-
-      tr:hover {
-        background-color: #f5f5f523;
-      }
-    </style>
   </head>
   <body>
     <div style="display: flex; align-items: center; height: 100%">
@@ -144,9 +62,11 @@
       let offscreenCanvas, offscreenCtx;
       let imageWidth, imageHeight;
       let currentTransform = d3.zoomIdentity;
-      let originalData = null;
-      let originalDataT = null;
+      let imageData = null;
+      let imageDataT = null;
+      let normalizedData = null;
       let scaleFactor = 1;
+      let headerData = {};
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
@@ -155,7 +75,6 @@
       const returnButton = document.getElementById("returnButton");
       const headerTable = document.getElementById("headerTable");
 
-      let headerData = {};
 
       headerTab.addEventListener("click", () => {
         gridContainer.style.display = "none";
@@ -183,7 +102,6 @@
       }
 
       function drawLineProfile(profileCtx, profileData, isHorizontal, offset) {
-        console.log(isHorizontal, offset);
         // set canvas size
         profileCtx.clearRect(
           0,
@@ -191,17 +109,7 @@
           profileCtx.canvas.width,
           profileCtx.canvas.height
         );
-        console.log(
-          "width, height",
-          profileCtx.canvas.width,
-          profileCtx.canvas.height
-        );
-        console.log("image width, height", imageWidth, imageHeight);
-        console.log(
-          "real width, height",
-          imageWidth / currentTransform.k,
-          imageHeight / currentTransform.k
-        );
+
         // Find max value for scaling
         const maxVal = Math.max(...profileData);
 
@@ -261,33 +169,41 @@
         profileCtx.stroke();
       }
 
-      function renderMonochromeImage(
-        normalizedData,
-        width,
-        height,
-        originalPixelData,
-        header
-      ) {
-        headerData = header;
-        imageWidth = width;
-        imageHeight = height;
-        originalData = originalPixelData;
+      async function renderMonochromeImage(fileUri) {
 
-        // Precompute the transposed data for vertical profiles
-        originalDataT = new Array(width);
-        for (let x = 0; x < width; x++) {
-          originalDataT[x] = new Array(height);
-          for (let y = 0; y < height; y++) {
-            originalDataT[x][y] = originalData[y * width + x];
+        // Step 1: Read the FITS file
+        console.time("renderMonochromeImage");
+        const response = await fetch(fileUri);
+        const arrayBuffer = await response.arrayBuffer();
+        console.timeLog("renderMonochromeImage", "FITS file loaded");
+
+        // Step 2: Create DataView for parsing
+        const dataView = new DataView(arrayBuffer);
+        console.timeLog("renderMonochromeImage", "DataView created");
+
+        // Step 3: Parse the FITS header and data
+        [headerData, normalizedData, imageWidth, imageHeight, imageData] =
+          parseFITSImage(arrayBuffer, dataView);
+
+        console.timeLog("renderMonochromeImage", "FITS header and data parsed");
+
+        // Step 4: Precompute the transposed data for vertical profiles
+        imageDataT = new Array(imageWidth);
+        for (let x = 0; x < imageWidth; x++) {
+          imageDataT[x] = new Array(imageHeight);
+          for (let y = 0; y < imageHeight; y++) {
+            imageDataT[x][y] = imageData[y * imageWidth + x];
           }
         }
 
-        const pixelData = normalizedData;
-        const imageData = new ImageData(width, height);
-        const data = imageData.data;
+        console.timeLog("renderMonochromeImage", "Data transposed");
 
-        for (let i = 0; i < pixelData.length; i++) {
-          const pixelValue = pixelData[i];
+        // Step 5: Compute the ImageData object for rendering
+        const canvasData = new ImageData(imageWidth, imageHeight);
+        const data = canvasData.data;
+
+        for (let i = 0; i < normalizedData.length; i++) {
+          const pixelValue = normalizedData[i];
           const index = i * 4;
           data[index] = pixelValue;
           data[index + 1] = pixelValue;
@@ -295,27 +211,32 @@
           data[index + 3] = 255;
         }
 
-        canvas.width = width;
-        canvas.height = height;
+        console.timeLog("renderMonochromeImage", "ImageData object created");
+
+        // Step 6: Render the image on the canvas
+        canvas.width = imageWidth;
+        canvas.height = imageHeight;
 
         offscreenCanvas = document.createElement("canvas");
-        offscreenCanvas.width = width;
-        offscreenCanvas.height = height;
+        offscreenCanvas.width = imageWidth;
+        offscreenCanvas.height = imageHeight;
         offscreenCtx = offscreenCanvas.getContext("2d");
-        offscreenCtx.putImageData(imageData, 0, 0);
+        offscreenCtx.putImageData(canvasData, 0, 0);
 
         ctx.drawImage(offscreenCanvas, 0, 0);
         ctx.webkitImageSmoothingEnabled = false;
         ctx.mozImageSmoothingEnabled = false;
         ctx.imageSmoothingEnabled = false;
 
+        console.timeLog("renderMonochromeImage", "Image rendered");
+
         // rescale the canvas to fit the window
         scaleFactor = Math.min(
-          window.innerWidth / width,
-          window.innerHeight / height
+          window.innerWidth / imageWidth,
+          window.innerHeight / imageHeight
         );
-        canvas.style.width = `${width * scaleFactor - 100}px`;
-        canvas.style.height = `${height * scaleFactor - 100}px`;
+        canvas.style.width = `${imageWidth * scaleFactor - 100}px`;
+        canvas.style.height = `${imageHeight * scaleFactor - 100}px`;
 
         spinner.style.display = "none";
         mainContainer.style.display = "grid";
@@ -325,17 +246,19 @@
 
         // Add mousemove event listener to show pixel value and line profiles
         canvas.addEventListener("mousemove", (event) => {
-          handler(event, width, height);
+          imageInteractionHandler(event, imageWidth, imageHeight);
         });
         canvas.addEventListener("wheel", (event) => {
-          handler(event, width, height);
+          imageInteractionHandler(event, imageWidth, imageHeight);
         });
         canvas.addEventListener("pointermove", (event) => {
-          handler(event, width, height);
+          imageInteractionHandler(event, imageWidth, imageHeight);
         });
+
+        console.timeEnd("renderMonochromeImage", "Image rendered finished");
       }
 
-      function handler(event, width, height) {
+      function imageInteractionHandler(event, width, height) {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
@@ -370,11 +293,11 @@
           transformedY < height
         ) {
           // Extract X and Y line profiles of region shown in the canvas
-          const xProfile = originalData.slice(
+          const xProfile = imageData.slice(
             transformedY * width + left,
             transformedY * width + left + xWidth + 1
           );
-          const yProfile = originalDataT[transformedX].slice(
+          const yProfile = imageDataT[transformedX].slice(
             top,
             top + yHeight + 1
           );
@@ -394,7 +317,7 @@
           );
 
           // Show pixel value
-          const pixelValue = originalData[transformedY * width + transformedX];
+          const pixelValue = imageData[transformedY * width + transformedX];
           document.getElementById("pixelValue").innerText = `${pixelValue}`;
           document.getElementById(
             "pixelPosition"
@@ -449,19 +372,13 @@
         d3.select(canvas).call(zoom);
       }
 
+      console.time("loadData");
       window.addEventListener("message", (event) => {
         const message = event.data;
         if (message.command === "loadData") {
-          requestAnimationFrame(() => {
-            renderMonochromeImage(
-              message.data,
-              message.width,
-              message.height,
-              message.originalData,
-              message.header
-            );
+            renderMonochromeImage(message.fileUri);
             setupZoom(); // Initialize zoom after rendering
-          });
+            console.timeEnd("loadData");
         }
       });
 
