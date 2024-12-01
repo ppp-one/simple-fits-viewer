@@ -28,6 +28,4 @@ See the [issues](http://github.com/ppp-one/simple-fits-viewer/issues) page for k
 
 ## Release Notes
 
-### 0.0.1
-
-Initial release of simple-fits-viewer.
+See the [CHANGELOG.md](https://github.com/ppp-one/simple-fits-viewer/blob/main/CHANGELOG.md) page for release notes.
