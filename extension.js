@@ -9,12 +9,22 @@ function activate(context) {
     );
 }
 
+class FITSFileDocument {
+    constructor(uri) {
+        this.uri = uri;
+    }
+}
+
 class FITSFileEditor {
     constructor(context) {
         this.context = context;
     }
 
-    async resolveCustomTextEditor(document, webviewPanel, token) {
+    openCustomDocument(uri, openContext, token) {
+        return new FITSFileDocument(uri);
+    }
+
+    async resolveCustomEditor(document, webviewPanel, token) {
 
         // Set up the webview content
         webviewPanel.webview.options = {
