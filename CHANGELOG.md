@@ -4,6 +4,13 @@ All notable changes to the "simple-fits-viewer" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+# [0.0.3] - 2024-12-03
+
+### Added
+
+- Faster read times
+- Prevent user saving/overwriting the original file
+
 ## [0.0.2] - 2024-12-01
 
 ### Fixed
