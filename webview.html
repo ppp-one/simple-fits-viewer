@@ -268,16 +268,12 @@
         // Step 5: Compute the ImageData object for rendering
         const canvasData = new ImageData(imageWidth, imageHeight);
         const data = canvasData.data;
-
         for (let i = 0; i < normalizedData.length; i++) {
-          const pixelValue = normalizedData[i];
-          const index = i * 4;
-          data[index] = pixelValue;
-          data[index + 1] = pixelValue;
-          data[index + 2] = pixelValue;
-          data[index + 3] = 255;
+            const pixelValue = normalizedData[i];
+            const index = i * 4;
+            data[index] = data[index + 1] = data[index + 2] = pixelValue;
+            data[index + 3] = 255;
         }
-
         console.timeLog("renderMonochromeImage", "ImageData object created");
 
         // Step 6: Render the image on the canvas
