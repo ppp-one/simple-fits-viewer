@@ -4,6 +4,12 @@ All notable changes to the "simple-fits-viewer" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+# [0.0.4] - 2024-12-03
+
+### Added
+
+- 8-bit image support
+
 # [0.0.3] - 2024-12-03
 
 ### Added

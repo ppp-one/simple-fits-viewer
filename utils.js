@@ -38,7 +38,7 @@ function parseFITSImage(arrayBuffer, dataView) {
 
     // Use a typed array for image data
     let data;
-    if (bitpix === 16 || bitpix === 32) {
+    if (bitpix === 8 || bitpix === 16 || bitpix === 32) {
         data = new Int32Array(dataSize);
     } else if (bitpix === -32) {
         data = new Float32Array(dataSize);
@@ -49,7 +49,9 @@ function parseFITSImage(arrayBuffer, dataView) {
     }
 
     for (let i = 0; i < dataSize; i++) {
-        if (bitpix === 16) {
+        if (bitpix === 8) {
+            data[i] = dataView.getUint8(offset) * bscale + bzero;
+        } else if (bitpix === 16) {
             data[i] = dataView.getInt16(offset, false) * bscale + bzero;
         } else if (bitpix === 32) {
             data[i] = dataView.getInt32(offset, false) * bscale + bzero;
