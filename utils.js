@@ -72,7 +72,7 @@ function parseFITSImage(arrayBuffer, dataView) {
     // );
     const scale = 255 / (vmax - vmin);
     const _offset = -vmin * scale;
-    const normalizedData = new Array(data.length);
+    const normalizedData = new Float32Array(data.length);
 
     for (let i = 0; i < data.length; i++) {
         normalizedData[i] = data[i] * scale + _offset;
