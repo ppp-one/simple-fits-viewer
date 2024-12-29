@@ -4,6 +4,13 @@ All notable changes to the "simple-fits-viewer" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+# [0.0.5] - 2024-12-29
+
+### Added
+
+- Large image support
+- Color theme color support by @360tetsu360
+
 # [0.0.4] - 2024-12-03
 
 ### Added
