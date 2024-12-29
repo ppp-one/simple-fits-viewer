@@ -98,6 +98,8 @@
       let scaleX = null;
       let scaleY = null;
       let headerData = {};
+      let profileColor = "ffffff";
+      let gridColor = "#e0e0e0";
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
@@ -136,6 +138,20 @@
         searchInput.value = "";
         displayHeaderTable(headerData);
       });
+
+      const mutationObserver = new MutationObserver((mutationsList, observer) => {
+        updateColor();
+      });
+
+      mutationObserver.observe(document.body, { childList: false, attributes: true })
+
+      function updateColor() {
+        const styles = getComputedStyle(document.querySelector('html'));
+        const editorCompositionBorder = styles.getPropertyValue('--vscode-editor-compositionBorder');
+        const editorForeGround = styles.getPropertyValue('--vscode-editor-foreground');
+        profileColor = editorCompositionBorder;
+        gridColor = editorForeGround;
+      }
 
       function displayHeaderTable(data) {
         headerTable.innerHTML = "";
@@ -180,7 +196,7 @@
         const maxVal = Math.max(...profileData);
 
         // Draw background grid
-        profileCtx.strokeStyle = "#e0e0e0";
+        profileCtx.strokeStyle = gridColor;
         profileCtx.beginPath();
         if (isHorizontal) {
           for (let i = 0; i <= 5; i++) {
@@ -198,7 +214,7 @@
         profileCtx.stroke();
 
         // Draw profile line
-        profileCtx.strokeStyle = "white";
+        profileCtx.strokeStyle = profileColor;
         profileCtx.beginPath();
         if (isHorizontal) {
           profileData.forEach((val, index) => {
@@ -450,6 +466,7 @@
         if (message.command === "loadData") {
           renderMonochromeImage(message.fileUri);
           setupZoom(); // Initialize zoom after rendering
+          updateColor();
           console.timeEnd("loadData");
         }
       });
