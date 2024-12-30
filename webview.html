@@ -219,7 +219,7 @@
         if (isHorizontal) {
           profileData.forEach((val, index) => {
             const x =
-              ((index - offset) / (profileData.length - 1)) *
+              ((index - offset) / (imageWidth / currentTransform.k)) *
               profileCtx.canvas.width;
             const y = profileCtx.canvas.height * (1 - val / maxVal);
             if (index === 0) {
@@ -231,12 +231,20 @@
               profileCtx.lineTo(x, prevY);
               profileCtx.lineTo(x, y);
             }
+            
+            // Draw the last point off-screen
+            if (index == profileData.length - 1) {
+              const nextX =
+                ((index + 1 - offset) / (imageWidth / currentTransform.k)) *
+                profileCtx.canvas.width;
+              profileCtx.lineTo(nextX, y); 
+            }
           });
         } else {
           profileData.forEach((val, index) => {
             const x = profileCtx.canvas.width * (1 - val / maxVal);
             const y =
-              ((index - offset) / (profileData.length - 1)) *
+              ((index - offset) / (imageHeight / currentTransform.k)) *
               profileCtx.canvas.height;
             if (index === 0) {
               profileCtx.moveTo(x, y);
@@ -245,6 +253,14 @@
                 profileCtx.canvas.width * (1 - profileData[index - 1] / maxVal);
               profileCtx.lineTo(prevX, y);
               profileCtx.lineTo(x, y);
+            }
+
+            // Draw the last point off-screen
+            if (index == profileData.length - 1) {
+              const nextY =
+                ((index + 1 - offset) / (imageHeight / currentTransform.k)) *
+                profileCtx.canvas.height;
+              profileCtx.lineTo(x, nextY); 
             }
           });
         }
@@ -374,9 +390,9 @@
           // Extract X and Y line profiles of region shown in the canvas
           const xProfile = imageData.slice(
             transformedY * width + left,
-            transformedY * width + left + xWidth
+            transformedY * width + left + xWidth + 1
           );
-          const yProfile = imageDataT[transformedX].slice(top, top + yHeight);
+          const yProfile = imageDataT[transformedX].slice(top, top + yHeight + 1);
 
           // Draw line profiles
           drawLineProfile(
@@ -409,10 +425,10 @@
           .zoom()
           .scaleExtent([1, 100]) // Zoom range
           .on("zoom", (event) => {
-            imageInteractionHandler(event.sourceEvent, imageWidth, imageHeight);
-
             let transform = event.transform;
             currentTransform = transform;
+
+            imageInteractionHandler(event.sourceEvent, imageWidth, imageHeight);
 
             const right =
               (transform.x - imageWidth / scaleX) / (transform.k / scaleX) +
