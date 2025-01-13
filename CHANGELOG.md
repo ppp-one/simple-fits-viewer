@@ -4,6 +4,12 @@ All notable changes to the "simple-fits-viewer" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+# [0.0.6] - 2025-01-13
+
+### Fixed
+
+- Fix misalignment of line profiles (issue #1) (#10) by @360tetsu360
+
 # [0.0.5] - 2024-12-29
 
 ### Added
