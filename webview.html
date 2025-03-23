@@ -19,6 +19,7 @@
           <p id="headerTab" class="toggle-button">header &gt;</p>
           <p id="pixelValue"></p>
           <p id="pixelPosition"></p>
+          <p id="fwhmValue"></p>
         </div>
       </div>
       <div
@@ -98,6 +99,7 @@
       let scaleX = null;
       let scaleY = null;
       let headerData = {};
+      let plateScale = null;
       let profileColor = "ffffff";
       let gridColor = "#e0e0e0";
 
@@ -122,6 +124,18 @@
         headerGridContainer.style.display = "none";
         imageGridContainer.style.display = "grid";
         searchInput.blur();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") {
+          headerGridContainer.style.display = "none";
+          imageGridContainer.style.display = "grid";
+          searchInput.blur();
+        } else if (event.key === "ArrowRight") {
+          imageGridContainer.style.display = "none";
+          headerGridContainer.style.display = "grid";
+          searchInput.focus();
+        }
       });
 
       searchInput.addEventListener("input", () => {
@@ -297,6 +311,22 @@
 
         console.timeLog("renderMonochromeImage", "FITS header and data parsed");
 
+        try {
+          // Get the pixel pitch and focal length from the FITS header
+          let pitch = parseFloat(headerData["XPIXSZ"].split("/")[0]);
+          let focalLength = parseFloat(headerData["FOCALLEN"].split("/")[0]);
+          let focalUnits = headerData["FOCALLEN"].split("/")[1];
+          if (focalUnits.includes("mm")) {
+            focalLength /= 1000;
+          }
+          plateScale =
+            Math.atan((pitch * 1e-6) / focalLength) * (180 / Math.PI) * 3600;
+        } catch (error) {
+          console.error("Error parsing plate scale", error);
+        }
+
+        console.timeLog("renderMonochromeImage", "Plate scale calculated");
+
         // Step 4: Precompute the transposed data for vertical profiles
         imageDataT = new Array(imageWidth);
         for (let x = 0; x < imageWidth; x++) {
@@ -431,6 +461,49 @@
           document.getElementById(
             "pixelPosition"
           ).innerText = `${transformedX}, ${transformedY}`;
+
+          // Calculate FWHM
+          const fwhmResult = calculateAdaptiveFWHM(
+            transformedX,
+            transformedY,
+            plateScale
+          );
+
+          // Draw aperture circles
+          let peak = fwhmResult.peak;
+          let background = fwhmResult.background;
+
+          // Clear the canvas and redraw the entire image
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Redraw the original image with the current transform
+          ctx.save();
+          ctx.translate(
+            currentTransform.x * scaleX,
+            currentTransform.y * scaleY
+          );
+          ctx.scale(currentTransform.k, currentTransform.k);
+          ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
+
+          if (peak / background > 1.2) {
+            drawApertureCircles(fwhmResult, scaleX / currentTransform.k);
+
+            // Display FWHM information
+            let fwhm = fwhmResult.fwhm;
+            if (plateScale) {
+              fwhm *= plateScale;
+              document.getElementById(
+                "fwhmValue"
+              ).innerText = `FWHM: ${formatNumber(fwhm, 2)} "`;
+            } else {
+              document.getElementById(
+                "fwhmValue"
+              ).innerText = `FWHM: ${formatNumber(fwhm, 2)} px`;
+            }
+          } else {
+            document.getElementById("fwhmValue").innerText = "FWHM: -";
+          }
+          ctx.restore();
         }
       }
 

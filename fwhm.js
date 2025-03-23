@@ -1,10 +1,4 @@
-/**
- * Calculates the FWHM (Full Width at Half Maximum) of a star in an image
- * @param {number[][]} image - 2D array representing the star image
- * @param {number} [centerX] - X coordinate of star center (optional, will find brightest pixel if not specified)
- * @param {number} [centerY] - Y coordinate of star center (optional, will find brightest pixel if not specified)
- * @returns {Object} Object containing FWHM and related measurements
- */
+// Function to calculate the Full Width at Half Maximum (FWHM) of a star in an image
 function calculateStarFWHM(image, centerX, centerY) {
     // Find the dimensions of the image
     const height = image.length;
@@ -134,9 +128,9 @@ function calculateStarFWHM(image, centerX, centerY) {
 
     // Calculate the appropriate aperture radii based on FWHM
     // These values are derived from the SEEING_RADIUS constants in the Java code
-    const r1 = fwhm * 1.7;
-    const r2 = fwhm * 1.9;
-    const r3 = fwhm * 2.55;
+    const r1 = fwhm * 3 / 2;
+    const r2 = fwhm * 4 / 2;
+    const r3 = fwhm * 5 / 2;
 
     return {
         center: { x: centerX, y: centerY },
@@ -153,53 +147,106 @@ function calculateStarFWHM(image, centerX, centerY) {
     };
 }
 
-/**
- * Example usage:
- * 
- * // Create a test star image (Gaussian distribution)
- function createTestStarImage(width, height, centerX, centerY, amplitude, sigma, background) {
-     const image = [];
-     for (let y = 0; y < height; y++) {
-         const row = [];
-         for (let x = 0; x < width; x++) {
-             const dx = x - centerX;
-             const dy = y - centerY;
-             const r2 = dx*dx + dy*dy;
-              row.push(amplitude * Math.exp(-r2/(2*sigma*sigma)) + background);
-         }
-         image.push(row);
-     }
-     return image;
- }
- 
- // Create a test image (50x50 pixels with a star at center)
- const testImage = createTestStarImage(50, 50, 25, 25, 100, 3, 10);
- 
- // Calculate FWHM
- const result = calculateStarFWHM(testImage);
- console.log(`FWHM: ${result.fwhm.toFixed(2)} pixels`);
- console.log(`Suggested aperture radius: ${result.radii.r1.toFixed(2)} pixels`);
- */
+// Function to extract a subarray around a point
+function extractSubarray(image, centerX, centerY, size) {
+    const halfSize = Math.floor(size / 2);
+    const startX = Math.max(0, centerX - halfSize);
+    const startY = Math.max(0, centerY - halfSize);
+    const endX = Math.min(imageWidth - 1, centerX + halfSize);
+    const endY = Math.min(imageHeight - 1, centerY + halfSize);
 
-function createTestStarImage(width, height, centerX, centerY, amplitude, sigma, background) {
-    const image = [];
+    const width = endX - startX + 1;
+    const height = endY - startY + 1;
+
+    const subarray = new Array(height);
     for (let y = 0; y < height; y++) {
-        const row = [];
+        subarray[y] = new Array(width);
         for (let x = 0; x < width; x++) {
-            const dx = x - centerX;
-            const dy = y - centerY;
-            const r2 = dx * dx + dy * dy;
-            row.push(amplitude * Math.exp(-r2 / (2 * sigma * sigma)) + background);
+            subarray[y][x] = imageData[(startY + y) * imageWidth + (startX + x)];
         }
-        image.push(row);
     }
-    return image;
+
+    return {
+        array: subarray,
+        offsetX: startX,
+        offsetY: startY
+    };
 }
 
-// // Create a test image (50x50 pixels with a star at center)
-// const testImage = createTestStarImage(250, 150, 70, 40, 10, 20 / 2.355, 100);
+// Function to calculate FWHM with automatic sizing
+function calculateAdaptiveFWHM(x, y, _plateScale) {
+    // Start with a reasonable box size
+    let boxSize = 20;
+    if (_plateScale === undefined) {
+        _plateScale = 1.0;
+    } else {
+        // set box to 20" in pixels
+        boxSize = Math.ceil(20 / _plateScale);
+    }
+    let fwhmResult = null;
+    let iteration = 0;
+    const MAX_ITERATIONS = 3;
 
-// // Calculate FWHM
-// const result = calculateStarFWHM(testImage);
-// console.log(`FWHM: ${result.fwhm.toFixed(2)} pixels`);
-// console.log(`Suggested aperture radius: ${result.radii.r1.toFixed(2)} pixels`);
+    // Extract initial subarray
+    let { array, offsetX, offsetY } = extractSubarray(imageData, x, y, boxSize);
+
+    // Convert from 1D array to 2D array format expected by calculateStarFWHM
+    let subarray2D = [];
+    for (let row = 0; row < array.length; row++) {
+        subarray2D.push(array[row]);
+    }
+
+    // Initial FWHM calculation
+    fwhmResult = calculateStarFWHM(subarray2D);
+
+    // Adaptive resizing - expand box if FWHM is large compared to box size
+    while (iteration < MAX_ITERATIONS && fwhmResult.fwhm * 5 > boxSize) {
+        boxSize = Math.min(Math.ceil(fwhmResult.fwhm * 10), Math.min(imageWidth, imageHeight) / 2);
+
+        // Extract larger subarray
+        let { array: newArray, offsetX: newOffsetX, offsetY: newOffsetY } =
+            extractSubarray(imageData, x, y, boxSize);
+
+        // Convert to 2D array
+        subarray2D = [];
+        for (let row = 0; row < newArray.length; row++) {
+            subarray2D.push(newArray[row]);
+        }
+
+        // Recalculate FWHM with larger box
+        fwhmResult = calculateStarFWHM(subarray2D, x - newOffsetX, y - newOffsetY);
+
+        // Update offsets
+        offsetX = newOffsetX;
+        offsetY = newOffsetY;
+
+        iteration++;
+    }
+    // console.log(`Iteration ${iteration}: FWHM = ${fwhmResult.fwhm}, Box size = ${boxSize}`);
+
+    // Adjust center coordinates to global image coordinates
+    fwhmResult.center.x += offsetX;
+    fwhmResult.center.y += offsetY;
+
+    return fwhmResult;
+}
+
+// Function to draw aperture circles based on FWHM
+function drawApertureCircles(fwhmResult, scale) {
+
+    // Draw the three aperture circles
+    const { center, radii } = fwhmResult;
+    ctx.lineWidth = scale;    // Keep line width constant
+
+    // FWHM circle
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';  // Green with transparency
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, fwhmResult.fwhm / 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Outer aperture (background)
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';  // Red with transparency
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radii.r3, 0, Math.PI * 2);
+    ctx.stroke();
+}
