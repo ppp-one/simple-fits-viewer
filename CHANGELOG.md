@@ -4,6 +4,17 @@ All notable changes to the "simple-fits-viewer" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.1.0] - 2025-03-23
+
+### Added
+
+- Added FWHM calculation in arcsec or px (if plate scale calculable from headers) on mouse hover (#7)
+- Added keyboard shortcuts for changing to headers/image view (right/left arrow keys)
+- Added keyboard shortcuts for clearing header search (esc key)
+- Focus on header search input when switching to header view
+- Resizing now scales the canvas to fit the window
+- Added 'Save as' .png functionality
+
 # [0.0.6] - 2025-01-13
 
 ### Fixed

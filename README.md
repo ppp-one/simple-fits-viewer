@@ -10,9 +10,9 @@ A simple Visual Studio Code extension for viewing FITS (Flexible Image Transport
 
 - **View FITS Images:** Easily open and view FITS files in Visual Studio Code.
 - **Zoom & Pan:** Navigate FITS images with intuitive zoom and pan controls.
-- **Header Display:** Access the headers associated with each FITS file.
+- **Header Display:** Access and search headers associated with each FITS file.
+- **FWHM/seeing calculation:** Calculate the Full Width at Half Maximum (FWHM) of stars in the image.
 - **Interactive Line Profiles:** View and analyze line profiles of FITS images.
-
 
 ## Requirements
 

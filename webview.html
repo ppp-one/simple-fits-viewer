@@ -102,6 +102,8 @@
       let plateScale = null;
       let profileColor = "ffffff";
       let gridColor = "#e0e0e0";
+      let filename = null;
+      let activeContextMenu = null;
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
@@ -176,6 +178,89 @@
             ".header-container"
           ).style.width = `${rect.width}px`;
         }
+      });
+
+      canvas.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+
+        // If there's already an active context menu, remove it first
+        if (activeContextMenu && document.body.contains(activeContextMenu)) {
+          document.body.removeChild(activeContextMenu);
+        }
+
+        const contextMenu = document.createElement("div");
+        contextMenu.style.position = "absolute";
+        contextMenu.style.top = `${event.clientY}px`;
+        contextMenu.style.left = `${event.clientX}px`;
+        contextMenu.style.backgroundColor = "#fff";
+        contextMenu.style.color = "#000";
+        contextMenu.style.border = "1px solid #ccc";
+        contextMenu.style.padding = "5px";
+        contextMenu.style.boxShadow = "0px 2px 5px rgba(0, 0, 0, 0.2)";
+        contextMenu.style.borderRadius = "5px";
+        contextMenu.style.zIndex = "1000";
+
+        // on hover
+        contextMenu.addEventListener("mouseenter", () => {
+          contextMenu.style.backgroundColor = "#ededed";
+        });
+
+        contextMenu.addEventListener("mouseover", () => {
+          contextMenu.style.backgroundColor = "#ededed";
+        });
+
+        contextMenu.addEventListener("mouseout", () => {
+          contextMenu.style.backgroundColor = "#fff";
+        });
+
+        const saveOption = document.createElement("div");
+        saveOption.textContent = "Save image as png";
+        saveOption.style.cursor = "pointer";
+        saveOption.style.padding = "3px";
+
+        saveOption.addEventListener("click", () => {
+          console.time("saveOption");
+          saveOption.textContent = "Preparing image...";
+
+          // Use requestAnimationFrame to allow the UI to update
+          requestAnimationFrame(() => {
+            // Use the faster Blob approach
+            offscreenCanvas.toBlob((blob) => {
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `${filename}.png`;
+              link.click();
+
+              // Clean up the object URL after use
+              setTimeout(() => {
+                URL.revokeObjectURL(url);
+                saveOption.textContent = "Save image as png";
+                console.timeEnd("saveOption");
+              }, 100);
+            }, "image/png");
+          });
+        });
+
+        contextMenu.appendChild(saveOption);
+        document.body.appendChild(contextMenu);
+
+        // Set this as the active context menu
+        activeContextMenu = contextMenu;
+
+        document.addEventListener(
+          "click",
+          () => {
+            if (document.body.contains(contextMenu)) {
+              document.body.removeChild(contextMenu);
+              // Clear the active context menu reference
+              if (activeContextMenu === contextMenu) {
+                activeContextMenu = null;
+              }
+            }
+          },
+          { once: true }
+        );
       });
 
       const mutationObserver = new MutationObserver(
@@ -318,6 +403,7 @@
       async function renderMonochromeImage(fileUri) {
         // Step 1: Read the FITS file
         console.time("renderMonochromeImage");
+        filename = fileUri.split("/").pop();
         const response = await fetch(fileUri);
         const arrayBuffer = await response.arrayBuffer();
         console.timeLog("renderMonochromeImage", "FITS file loaded");
