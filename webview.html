@@ -115,11 +115,13 @@
       headerTab.addEventListener("click", () => {
         imageGridContainer.style.display = "none";
         headerGridContainer.style.display = "grid";
+        searchInput.focus();
       });
 
       returnButton.addEventListener("click", () => {
         headerGridContainer.style.display = "none";
         imageGridContainer.style.display = "grid";
+        searchInput.blur();
       });
 
       searchInput.addEventListener("input", () => {
@@ -139,16 +141,25 @@
         displayHeaderTable(headerData);
       });
 
-      const mutationObserver = new MutationObserver((mutationsList, observer) => {
-        updateColor();
+      const mutationObserver = new MutationObserver(
+        (mutationsList, observer) => {
+          updateColor();
+        }
+      );
+
+      mutationObserver.observe(document.body, {
+        childList: false,
+        attributes: true,
       });
 
-      mutationObserver.observe(document.body, { childList: false, attributes: true })
-
       function updateColor() {
-        const styles = getComputedStyle(document.querySelector('html'));
-        const editorCompositionBorder = styles.getPropertyValue('--vscode-editor-compositionBorder');
-        const editorForeGround = styles.getPropertyValue('--vscode-editor-foreground');
+        const styles = getComputedStyle(document.querySelector("html"));
+        const editorCompositionBorder = styles.getPropertyValue(
+          "--vscode-editor-compositionBorder"
+        );
+        const editorForeGround = styles.getPropertyValue(
+          "--vscode-editor-foreground"
+        );
         profileColor = editorCompositionBorder;
         gridColor = editorForeGround;
       }
@@ -231,13 +242,13 @@
               profileCtx.lineTo(x, prevY);
               profileCtx.lineTo(x, y);
             }
-            
+
             // Draw the last point off-screen
             if (index == profileData.length - 1) {
               const nextX =
                 ((index + 1 - offset) / (imageWidth / currentTransform.k)) *
                 profileCtx.canvas.width;
-              profileCtx.lineTo(nextX, y); 
+              profileCtx.lineTo(nextX, y);
             }
           });
         } else {
@@ -260,7 +271,7 @@
               const nextY =
                 ((index + 1 - offset) / (imageHeight / currentTransform.k)) *
                 profileCtx.canvas.height;
-              profileCtx.lineTo(x, nextY); 
+              profileCtx.lineTo(x, nextY);
             }
           });
         }
@@ -301,10 +312,10 @@
         const canvasData = new ImageData(imageWidth, imageHeight);
         const data = canvasData.data;
         for (let i = 0; i < normalizedData.length; i++) {
-            const pixelValue = normalizedData[i];
-            const index = i * 4;
-            data[index] = data[index + 1] = data[index + 2] = pixelValue;
-            data[index + 3] = 255;
+          const pixelValue = normalizedData[i];
+          const index = i * 4;
+          data[index] = data[index + 1] = data[index + 2] = pixelValue;
+          data[index + 3] = 255;
         }
         console.timeLog("renderMonochromeImage", "ImageData object created");
 
@@ -392,7 +403,10 @@
             transformedY * width + left,
             transformedY * width + left + xWidth + 1
           );
-          const yProfile = imageDataT[transformedX].slice(top, top + yHeight + 1);
+          const yProfile = imageDataT[transformedX].slice(
+            top,
+            top + yHeight + 1
+          );
 
           // Draw line profiles
           drawLineProfile(
