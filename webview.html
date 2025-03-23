@@ -135,6 +135,9 @@
           imageGridContainer.style.display = "none";
           headerGridContainer.style.display = "grid";
           searchInput.focus();
+        } else if (event.key === "Escape") {
+          searchInput.value = "";
+          displayHeaderTable(headerData);
         }
       });
 
@@ -153,6 +156,26 @@
       resetButton.addEventListener("click", () => {
         searchInput.value = "";
         displayHeaderTable(headerData);
+      });
+
+      // if resizing the window, rescale the canvas
+      window.addEventListener("resize", () => {
+        if (imageWidth && imageHeight) {
+          scaleFactor = Math.min(
+            window.innerWidth / imageWidth,
+            window.innerHeight / imageHeight
+          );
+          canvas.style.width = `${imageWidth * scaleFactor - 100}px`;
+          canvas.style.height = `${imageHeight * scaleFactor - 100}px`;
+          rect = canvas.getBoundingClientRect();
+          scaleX = canvas.width / rect.width;
+          scaleY = canvas.height / rect.height;
+          xProfileCanvas.width = rect.width;
+          yProfileCanvas.height = rect.height;
+          document.querySelector(
+            ".header-container"
+          ).style.width = `${rect.width}px`;
+        }
       });
 
       const mutationObserver = new MutationObserver(
@@ -485,7 +508,7 @@
           ctx.scale(currentTransform.k, currentTransform.k);
           ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
 
-          if (peak / background > 1.2) {
+          if ((peak / background > 1.2) & (fwhmResult.fwhm > 0)) {
             drawApertureCircles(fwhmResult, scaleX / currentTransform.k);
 
             // Display FWHM information
