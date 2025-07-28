@@ -200,23 +200,58 @@
         contextMenu.style.borderRadius = "5px";
         contextMenu.style.zIndex = "1000";
 
-        // on hover
-        contextMenu.addEventListener("mouseenter", () => {
-          contextMenu.style.backgroundColor = "#ededed";
+        // Helper to add hover effect to menu options
+        function addHoverEffect(optionDiv) {
+          optionDiv.addEventListener("mouseenter", () => {
+            optionDiv.style.backgroundColor = "#ededed";
+          });
+          optionDiv.addEventListener("mouseleave", () => {
+            optionDiv.style.backgroundColor = "#fff";
+          });
+        }
+
+        // Copy image to clipboard option
+        const copyOption = document.createElement("div");
+        copyOption.textContent = "Copy image to clipboard";
+        copyOption.style.cursor = "pointer";
+        copyOption.style.padding = "3px";
+        addHoverEffect(copyOption);
+
+        copyOption.addEventListener("click", async () => {
+          copyOption.textContent = "Copying...";
+          try {
+            // Use toBlob to get the image as a Blob
+            offscreenCanvas.toBlob(async (blob) => {
+              try {
+                await navigator.clipboard.write([
+                  new ClipboardItem({
+                    "image/png": blob,
+                  }),
+                ]);
+                copyOption.textContent = "Copied!";
+              } catch (err) {
+                copyOption.textContent = "Failed to copy";
+              }
+              setTimeout(() => {
+                copyOption.textContent = "Copy image to clipboard";
+              }, 1000);
+            }, "image/png");
+          } catch (err) {
+            copyOption.textContent = "Failed to copy";
+            setTimeout(() => {
+              copyOption.textContent = "Copy image to clipboard";
+            }, 1000);
+          }
         });
 
-        contextMenu.addEventListener("mouseover", () => {
-          contextMenu.style.backgroundColor = "#ededed";
-        });
+        contextMenu.appendChild(copyOption);
 
-        contextMenu.addEventListener("mouseout", () => {
-          contextMenu.style.backgroundColor = "#fff";
-        });
-
+        // Save image as png option
         const saveOption = document.createElement("div");
         saveOption.textContent = "Save image as png";
         saveOption.style.cursor = "pointer";
         saveOption.style.padding = "3px";
+        addHoverEffect(saveOption);
 
         saveOption.addEventListener("click", () => {
           console.time("saveOption");

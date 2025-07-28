@@ -4,6 +4,12 @@ All notable changes to the "simple-fits-viewer" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.1.1] - 2025-07-28
+
+### Added
+
+- Added copy image to clipboard functionality
+
 ## [0.1.0] - 2025-03-23
 
 ### Added
