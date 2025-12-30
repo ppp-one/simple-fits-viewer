@@ -527,7 +527,9 @@
 
           const n = Math.ceil((decmax - decmin) / step) + 2;
           for (let i = 0; i <= n; i++) {
-            const dec = decmin + (i-1) * step;
+            const rawDec = decmin + (i-1) * step;
+            const dec = Math.max(-90, Math.min(90, rawDec));
+
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
@@ -545,6 +547,8 @@
             lastOk = true;
             lastX = x;
             lastY = y;
+
+            if (rawDec > 90) break;
           }
 
           const priorityRA = ["bottom", "right", "top", "left"];
@@ -573,7 +577,9 @@
           
           const n = Math.ceil((ramax - ramin) / rastepLocal) + 2;
           for (let i = 0; i <= n; i++) {
-            const ra = ramin + (i-1) * rastepLocal;
+            const rawRa = ramin + (i-1) * rastepLocal;
+            const ra = Math.max(ramin, Math.min(ramin + 360, rawRa));
+
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
@@ -591,6 +597,8 @@
             lastOk = true;
             lastX = x;
             lastY = y;
+
+            if (rawRa - ramin > 360) break;
           }
 
           const priorityRA = ["left", "top", "right", "bottom"];
