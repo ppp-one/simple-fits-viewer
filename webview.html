@@ -477,7 +477,6 @@
         profileCtx.stroke();
       }
 
-            
       function drawWCSGrid() {
         const ctx = gridCtx;
         const canvas = ctx.canvas;
@@ -492,8 +491,6 @@
         const top = (-currentTransform.y * scaleY) / currentTransform.k;
 
         const k  = currentTransform.k;
-        const tx = currentTransform.x * scaleX;
-        const ty = currentTransform.y * scaleY;
 
         // WCS bounds
         let [ramin, ramax, decmin, decmax] =
