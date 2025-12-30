@@ -30,84 +30,85 @@ function calculateGridTicks(range, targetTicks = 6) {
 }
 
 function intersect(x1, y1, x2, y2, width, height) {
-  let hits = [];
+    let hits = [];
 
-  const dx = x1 - x2;
-  const dy = y1 - y2;
-  let angle = Math.atan(dy/dx);
-  // left
-  if (x1 * x2 < 0) {
-    const t = (0 - x1) / (x2 - x1);
-    const y = y1 + t * (y2 - y1);
-    if (0 <= y && y <= height) hits.push({ edge: "left", x: 0, y, angle });
-  }
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    let angle = Math.atan(dy/dx);
+    // left
+    if (x1 * x2 < 0) {
+        const t = (0 - x1) / (x2 - x1);
+        const y = y1 + t * (y2 - y1);
+        if (0 <= y && y <= height) hits.push({ edge: "left", x: 0, y, angle });
+    }
 
-  // right
-  if ((x1 - width) * (x2 - width) < 0) {
-    const t = (width - x1) / (x2 - x1);
-    const y = y1 + t * (y2 - y1);
-    if (0 <= y && y <= height) hits.push({ edge: "right", x: width, y, angle });
-  }
+    // right
+    if ((x1 - width) * (x2 - width) < 0) {
+        const t = (width - x1) / (x2 - x1);
+        const y = y1 + t * (y2 - y1);
+        if (0 <= y && y <= height) hits.push({ edge: "right", x: width, y, angle });
+    }
 
-  // top
-  if (y1 * y2 < 0) {
-    const t = (0 - y1) / (y2 - y1);
-    const x = x1 + t * (x2 - x1);
-    if (0 <= x && x <= width) hits.push({ edge: "top", x, y: 0, angle });
-  }
+    // top
+    if (y1 * y2 < 0) {
+        const t = (0 - y1) / (y2 - y1);
+        const x = x1 + t * (x2 - x1);
+        if (0 <= x && x <= width) hits.push({ edge: "top", x, y: 0, angle });
+    }
 
-  // bottom
-  if ((y1 - height) * (y2 - height) < 0) {
-    const t = (height - y1) / (y2 - y1);
-    const x = x1 + t * (x2 - x1);
-    if (0 <= x && x <= width) hits.push({ edge: "bottom", x, y: height, angle });
-  }
+    // bottom
+    if ((y1 - height) * (y2 - height) < 0) {
+        const t = (height - y1) / (y2 - y1);
+        const x = x1 + t * (x2 - x1);
+        if (0 <= x && x <= width) hits.push({ edge: "bottom", x, y: height, angle });
+    }
 
-  return hits;
+    return hits;
 }
 
 function groupByEdge(hits) {
-  const map = {
-    bottom: [],
-    top: [],
-    left: [],
-    right: []
-  };
+    const map = {
+        bottom: [],
+        top: [],
+        left: [],
+        right: []
+    };
 
-  for (const h of hits) {
-    if (map[h.edge]) map[h.edge].push(h);
-  }
-  return map;
+    for (const h of hits) {
+        if (map[h.edge]) map[h.edge].push(h);
+    }
+
+    return map;
 }
 
 function selectHitByPriority(hits, priority, W, H) {
-  const grouped = groupByEdge(hits);
+    const grouped = groupByEdge(hits);
 
-  for (const edge of priority) {
-    const list = grouped[edge];
-    if (!list || list.length === 0) continue;
+    for (const edge of priority) {
+        const list = grouped[edge];
+        if (!list || list.length === 0) continue;
 
-    let best = list[0];
-    let bestScore = Infinity;
+        let best = list[0];
+        let bestScore = Infinity;
 
-    for (const h of list) {
-      let d;
-      if (edge === "left" || edge === "right") {
-        d = Math.abs(h.y - H * 0.5);
-      } else {
-        d = Math.abs(h.x - W * 0.5);
-      }
+        for (const h of list) {
+            let d;
+            if (edge === "left" || edge === "right") {
+                d = Math.abs(h.y - H * 0.5);
+            } else {
+                d = Math.abs(h.x - W * 0.5);
+            }
 
-      if (d < bestScore) {
-        bestScore = d;
-        best = h;
-      }
+            if (d < bestScore) {
+                bestScore = d;
+                best = h;
+            }
+        }
+
+        return best;
     }
 
-    return best;
-  }
-
-  return null;
+    return null;
 }
 
 function decideAngularUnit(stepDeg) {
@@ -117,6 +118,7 @@ function decideAngularUnit(stepDeg) {
     if (stepDeg >= 1) {
         return 60;
     }
+
     return 3600;
 }
 
@@ -350,8 +352,8 @@ class WCS {
 
         this.aorder = parseInt(header["A_ORDER"].split("/")[0], 10);
         this.a = parseWCSPolynomial(header, "A", this.aorder);
-        this.b_order = parseInt(header["B_ORDER"].split("/")[0], 10);
-        this.b = parseWCSPolynomial(header, "B", this.b_order);
+        this.border = parseInt(header["B_ORDER"].split("/")[0], 10);
+        this.b = parseWCSPolynomial(header, "B", this.border);
         this.aporder = parseInt(header["AP_ORDER"].split("/")[0], 10);
         this.ap = parseWCSPolynomial(header, "AP", this.aporder);
         this.bporder = parseInt(header["BP_ORDER"].split("/")[0], 10);
@@ -481,7 +483,7 @@ class WCS {
         powv[0] = 1.0;
         powv[1] = v; 
 
-        for (let i = 2; i <= Math.max(this.aorder, this.b_order); i++) {
+        for (let i = 2; i <= Math.max(this.aorder, this.border); i++) {
             powu[i] = powu[i - 1] * u; // u^i = u^(i-1) * u
             powv[i] = powv[i - 1] * v; // v^i = v^(i-1) * v
         }
@@ -496,9 +498,9 @@ class WCS {
             }
         }
 
-        for (let i = 0; i <= this.b_order; i++) {
-            for (let j = 0; j <= this.b_order; j++) {
-                if (i + j <= this.b_order) {
+        for (let i = 0; i <= this.border; i++) {
+            for (let j = 0; j <= this.border; j++) {
+                if (i + j <= this.border) {
                     guv += this.b[i][j] * powu[i] * powv[j];
                 }
             }
