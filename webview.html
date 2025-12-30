@@ -509,6 +509,7 @@
         const arcsecStep = pixScale * (lineStep / k);
         const step = arcsecStep / 3600;
 
+        // Grid spacing for labels (RA / Dec)
         const rastep = calculateGridTicks((ramax - ramin) / (1 + 2 * margin));
         const decstep = calculateGridTicks((decmax - decmin) / (1 + 2 * margin));
 
@@ -536,11 +537,11 @@
             // Clamp Dec to physical limits
             const dec = Math.max(-90, Math.min(90, rawDec));
 
-            // WCS projection (RA,Dec → pixel)
+            // WCS projection (RA,Dec -> pixel)
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
-            // Convert image pixel coords → canvas coords
+            // Convert image pixel coords -> canvas coords
             const x = (xy[0] - left) / (imageWidth / k) * canvas.width;
             const y = (xy[1] - top) / (imageHeight / k) * canvas.height;
 
@@ -596,11 +597,11 @@
             // Limit RA to one full wrap to avoid infinite looping
             const ra = Math.max(ramin, Math.min(ramin + 360, rawRa));
 
-            // WCS projection (RA,Dec → pixel)
+            // WCS projection (RA,Dec -> pixel)
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
-            // Convert image pixel coords → canvas coords
+            // Convert image pixel coords -> canvas coords
             const x = (xy[0] - left) / (imageWidth / k) * canvas.width;
             const y = (xy[1] - top) / (imageHeight / k) * canvas.height;
 
@@ -638,33 +639,18 @@
         ctx.fillStyle = "white";
         ctx.font = `12px sans-serif`;
         ctx.translate(hit.x, hit.y);
+        ctx.rotate(hit.angle);
+
+        // Padding for label placement
         const pad = 18;
-        if (hit.angle) ctx.rotate(hit.angle);
 
-        
+        // Draw label
         switch (hit.edge) {
-          case "bottom":
-            if (Math.sin(hit.angle) >= 0) {
-              ctx.textAlign = "right";
-              ctx.textBaseline = "bottom";
-              ctx.fillText(text, -pad, 0);
-            } else {
-              ctx.textAlign = "left";
-              ctx.textBaseline = "bottom";
-              ctx.fillText(text, pad, 0);
-            }
-            break;
-
           case "top":
-            if (Math.sin(hit.angle) <= 0) {
-              ctx.textAlign = "right";
-              ctx.textBaseline = "bottom";
-              ctx.fillText(text, -pad, 0);
-            } else {
-              ctx.textAlign = "left";
-              ctx.textBaseline = "bottom";
-              ctx.fillText(text, pad, 0);
-            }
+          case "bottom": 
+            const rightSide = Math.sin(hit.angle) <= 0;
+            ctx.textAlign = rightSide ? "right" : "left";
+            ctx.fillText(text, rightSide ? -pad : pad, 0);
             break;
 
           case "left":
