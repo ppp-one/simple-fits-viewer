@@ -491,7 +491,8 @@
         const left = (-currentTransform.x * scaleX) / k;
         const top = (-currentTransform.y * scaleY) / k;
 
-        // WCS bounds
+        // Determine WCS bounds slightly larger than the view
+        // (margin is used to avoid cutting grid lines at the edges)
         const margin = 0.1;
         let [ramin, ramax, decmin, decmax] =
           wcs.sipGetRadecBounds(50 / k,
@@ -500,21 +501,23 @@
           xWidth * (1 + 2 * margin), 
           yHeight * (1 + 2 * margin));
 
+        // Grid sampling parameters
         const pixScale = wcs.tanPixelScale(); // arcsec / pixel
         const lineStep = 50;
 
-        // adaptive sampling
+        // Adaptive sampling step (in degrees)
         const arcsecStep = pixScale * (lineStep / k);
         const step = arcsecStep / 3600;
 
         const rastep = calculateGridTicks((ramax - ramin) / (1 + 2 * margin));
         const decstep = calculateGridTicks((decmax - decmin) / (1 + 2 * margin));
 
-        // drawing
+        // Drawing setup
         ctx.strokeStyle = "white";
         ctx.lineWidth = 1;
         ctx.beginPath();
 
+        // RA grid lines
         for (let ra = rastep * Math.floor(ramin / rastep); 
             ra <= rastep * Math.ceil(ramax / rastep); 
             ra += rastep) {
@@ -523,24 +526,31 @@
           let lastX = null;
           let lastY = null;
 
+          // Intersection points with canvas edges (for labels)
           const hits = [];
 
           const n = Math.ceil((decmax - decmin) / step) + 2;
           for (let i = 0; i <= n; i++) {
             const rawDec = decmin + (i-1) * step;
+
+            // Clamp Dec to physical limits
             const dec = Math.max(-90, Math.min(90, rawDec));
 
+            // WCS projection (RA,Dec → pixel)
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
+            // Convert image pixel coords → canvas coords
             const x = (xy[0] - left) / (imageWidth / k) * canvas.width;
             const y = (xy[1] - top) / (imageHeight / k) * canvas.height;
 
+            // Track intersections with canvas edges
             if (lastX !== null && lastY !== null) {
               const hits_ = intersect(x, y, lastX, lastY, canvas.width, canvas.height);
               hits.push(...hits_);
             }
 
+            // Draw continuous line segments only when projection is valid
             if (lastOk) ctx.lineTo(x, y);
             else        ctx.moveTo(x, y);
 
@@ -548,24 +558,27 @@
             lastX = x;
             lastY = y;
 
+            // Stop once we pass the north pole
             if (rawDec > 90) break;
           }
 
+          // Label placement priority for RA lines
           const priorityRA = ["bottom", "right", "top", "left"];
-
           const hit = selectHitByPriority(hits, priorityRA, canvas.width, canvas.height);
           if (hit) {
             drawLabel(ctx, hit, formatRa(ra, rastep));
           }
         }
 
-        // Dec lines
+        // Dec grid lines
         for (let dec = decstep * Math.floor(decmin / decstep);
           dec <= decstep * Math.ceil(decmax / decstep);
           dec += decstep) {
 
+          // Skip invalid declinations
           if (Math.abs(dec) > 90) continue;
 
+          // RA sampling must be denser near the poles
           const cosDec = Math.cos(dec * Math.PI / 180);
           const rastepLocal = step / Math.max(0.1, cosDec);
 
@@ -573,24 +586,31 @@
           let lastX = null;
           let lastY = null;
 
+          // Intersection points with canvas edges (for labels)
           const hits = [];
           
           const n = Math.ceil((ramax - ramin) / rastepLocal) + 2;
           for (let i = 0; i <= n; i++) {
             const rawRa = ramin + (i-1) * rastepLocal;
+
+            // Limit RA to one full wrap to avoid infinite looping
             const ra = Math.max(ramin, Math.min(ramin + 360, rawRa));
 
+            // WCS projection (RA,Dec → pixel)
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
+            // Convert image pixel coords → canvas coords
             const x = (xy[0] - left) / (imageWidth / k) * canvas.width;
             const y = (xy[1] - top) / (imageHeight / k) * canvas.height;
 
+            // Track intersections with canvas edges
             if (lastX !== null && lastY !== null) {
               const hits_ = intersect(x, y, lastX, lastY, canvas.width, canvas.height);
               hits.push(...hits_);
             }
 
+            // Draw continuous line segments only when projection is valid
             if (lastOk) ctx.lineTo(x, y);
             else        ctx.moveTo(x, y);
 
@@ -598,11 +618,12 @@
             lastX = x;
             lastY = y;
 
+            // Stop after one full RA range
             if (rawRa - ramin > 360) break;
           }
 
+          // Label placement priority for Dec lines
           const priorityRA = ["left", "top", "right", "bottom"];
-
           const hit = selectHitByPriority(hits, priorityRA, canvas.width, canvas.height);
           if (hit) {
             drawLabel(ctx, hit, formatDec(dec, decstep));
