@@ -17,13 +17,7 @@ const ANGULAR_STEPS = [
     30/3600, 20/3600, 15/3600, 10/3600, 5/3600, 2/3600, 1/3600
 ];
 
-function calculateGridTicks(minValue, maxValue, targetTicks = 6) {
-    if (minValue >= maxValue) {
-        throw new Error("minValue must be less than maxValue");
-    }
-
-    const range = maxValue - minValue;
-
+function calculateGridTicks(range, targetTicks = 6) {
     const idealStep = range / targetTicks;
 
     for (const step of ANGULAR_STEPS) {

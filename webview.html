@@ -485,36 +485,30 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // view parameters
-        const xWidth = imageWidth / currentTransform.k;
-        const yHeight = imageHeight / currentTransform.k;
-        const left = (-currentTransform.x * scaleX) / currentTransform.k;
-        const top = (-currentTransform.y * scaleY) / currentTransform.k;
-
         const k  = currentTransform.k;
+        const xWidth = imageWidth / k;
+        const yHeight = imageHeight / k;
+        const left = (-currentTransform.x * scaleX) / k;
+        const top = (-currentTransform.y * scaleY) / k;
 
         // WCS bounds
+        const margin = 0.1;
         let [ramin, ramax, decmin, decmax] =
-          wcs.sipGetRadecBounds(50, left, top, xWidth, yHeight);
+          wcs.sipGetRadecBounds(50 / k,
+          left - xWidth * margin, 
+          top - yHeight * margin, 
+          xWidth * (1 + 2 * margin), 
+          yHeight * (1 + 2 * margin));
 
         const pixScale = wcs.tanPixelScale(); // arcsec / pixel
         const lineStep = 50;
 
         // adaptive sampling
-        const minPixelStep = 1.5; // px
-        const minWorldStep = (minPixelStep / (pixScale * k)) / 3600 / scaleFactor;
+        const arcsecStep = pixScale * (lineStep / k);
+        const step = arcsecStep / 3600;
 
-        const baseStep = (pixScale * (lineStep / k)) / 3600 / scaleFactor;
-        const step = Math.max(baseStep, minWorldStep);
-
-        const rastep = calculateGridTicks(ramin, ramax);
-        const decstep = calculateGridTicks(decmin, decmax);
-
-        let margin = 1 * step;
-
-        ramin -= margin;
-        ramax += margin;
-        decmin -= margin;
-        decmax += margin;
+        const rastep = calculateGridTicks((ramax - ramin) / (1 + 2 * margin));
+        const decstep = calculateGridTicks((decmax - decmin) / (1 + 2 * margin));
 
         // drawing
         ctx.strokeStyle = "white";
@@ -537,8 +531,8 @@
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
-            const x = (xy[0] - left) / (imageWidth / currentTransform.k) * canvas.width;
-            const y = (xy[1] - top) / (imageHeight / currentTransform.k) * canvas.height;
+            const x = (xy[0] - left) / (imageWidth / k) * canvas.width;
+            const y = (xy[1] - top) / (imageHeight / k) * canvas.height;
 
             if (lastX !== null && lastY !== null) {
               const hits_ = intersect(x, y, lastX, lastY, canvas.width, canvas.height);
@@ -583,8 +577,8 @@
             const xy = wcs.sipRadec2Pixelxy(ra, dec);
             if (!xy) { lastOk = false; continue; }
 
-            const x = (xy[0] - left) / (imageWidth / currentTransform.k) * canvas.width;
-            const y = (xy[1] - top) / (imageHeight / currentTransform.k) * canvas.height;
+            const x = (xy[0] - left) / (imageWidth / k) * canvas.width;
+            const y = (xy[1] - top) / (imageHeight / k) * canvas.height;
 
             if (lastX !== null && lastY !== null) {
               const hits_ = intersect(x, y, lastX, lastY, canvas.width, canvas.height);
