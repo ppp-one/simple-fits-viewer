@@ -222,8 +222,10 @@ function starCoords(s, r, tangent) {
     // ASSUME r,s are unit vectors
     // sdotr:  s dot r = |r||s| cos(theta) = cos(theta)
     let sdotr = s[0] * r[0] + s[1] * r[1] + s[2] * r[2];
-    if (sdotr <= 0.0) {
-        // on the opposite side of the sky
+
+    const COS_MAX_THETA = Math.cos(80 * Math.PI / 180);
+    if (sdotr <= COS_MAX_THETA) {
+        // Limit angular distance to avoid TAN projection divergence
         return null;
     }
     if (r[2] == 1.0) {
