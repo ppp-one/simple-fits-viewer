@@ -579,9 +579,9 @@
           dec += decstep) {
 
           // Skip invalid declinations
-          if (Math.abs(dec) > 90) continue;
+          if (Math.abs(dec) >= 90) continue;
 
-          // RA sampling must be denser near the poles
+          // Normalize RA sampling density.
           const cosDec = Math.cos(dec * Math.PI / 180);
           const rastepLocal = step / Math.max(0.1, cosDec);
 
@@ -626,8 +626,8 @@
           }
 
           // Label placement priority for Dec lines
-          const priorityRA = ["left", "top", "right", "bottom"];
-          const hit = selectHitByPriority(hits, priorityRA, canvas.width, canvas.height);
+          const priorityDec = ["left", "top", "right", "bottom"];
+          const hit = selectHitByPriority(hits, priorityDec, canvas.width, canvas.height);
           if (hit) {
             drawLabel(ctx, hit, formatDec(dec, decstep));
           }
