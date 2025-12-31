@@ -523,6 +523,8 @@
             ra <= rastep * Math.ceil(ramax / rastep); 
             ra += rastep) {
 
+          if (ra >= rastep * Math.floor(ramin / rastep) + 360) continue;
+
           let lastOk = false;
           let lastX = null;
           let lastY = null;
