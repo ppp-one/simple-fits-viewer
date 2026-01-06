@@ -53,6 +53,14 @@ class FITSFileEditor {
                                 fileUri: fitsFileUri.toString()
                             });
                         }
+
+                        if (message.command === 'openExternal' && message.url) {
+                            try {
+                                vscode.env.openExternal(vscode.Uri.parse(message.url));
+                            } catch (err) {
+                                vscode.window.showErrorMessage(`Failed to open external link: ${err.message}`);
+                            }
+                        }
                     },
                     undefined,
                     this.context.subscriptions
@@ -91,12 +99,15 @@ class FITSFileEditor {
         const fwhmPath = path.join(__dirname, 'fwhm.js');
         const fwhmContent = fs.readFileSync(fwhmPath, 'utf8');
 
+        const wcsPath = path.join(__dirname, 'wcs.js');
+        const wcsContent = fs.readFileSync(wcsPath, 'utf8');
+
         // Attach styles.css
         const stylePath = path.join(__dirname, 'style.css');
         const styleContent = fs.readFileSync(stylePath, 'utf8');
 
         // Inject utils.js and styles.css content into the webview HTML
-        content = content.replace('</body>', `<script>${utilsContent}</script><script>${fwhmContent}</script><style>${styleContent}</style></body>`);
+        content = content.replace('</body>', `<script>${utilsContent}</script><script>${fwhmContent}</script><script>${wcsContent}</script><style>${styleContent}</style></body>`);
         return content;
     }
 }
