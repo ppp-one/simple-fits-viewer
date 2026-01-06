@@ -12,7 +12,10 @@
     </div>
     <div class="mainContainer" style="display: none">
       <div id="imageGridContainer" class="grid-container">
-        <canvas id="loadedImage"></canvas>
+        <div id="canvasContainer">
+          <canvas id="loadedImage"></canvas>
+          <canvas id="gridLayer"></canvas>
+        </div>
         <canvas id="yProfile" width="100"></canvas>
         <canvas id="xProfile" height="100"></canvas>
         <div class="info-corner">
@@ -20,6 +23,7 @@
           <p id="pixelValue"></p>
           <p id="pixelPosition"></p>
           <p id="fwhmValue"></p>
+          <p id="gridShow" class="toggle-button">show grid</p>
         </div>
       </div>
       <div
@@ -80,8 +84,13 @@
       const vscode = acquireVsCodeApi();
       const spinner = document.getElementById("spinner");
 
+      const canvasContainer = document.getElementById("canvasContainer");
+
       const canvas = document.getElementById("loadedImage");
       const ctx = canvas.getContext("2d");
+
+      const gridCanvas = document.getElementById("gridLayer");
+      const gridCtx = gridCanvas.getContext("2d");
 
       const xProfileCanvas = document.getElementById("xProfile");
       const xProfileCtx = xProfileCanvas.getContext("2d");
@@ -104,6 +113,8 @@
       let gridColor = "#e0e0e0";
       let filename = null;
       let activeContextMenu = null;
+      let showGrid = false;
+      let wcs = null;
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
@@ -115,6 +126,7 @@
       const headerTable = document.getElementById("headerTable");
       const searchInput = document.getElementById("searchInput");
       const resetButton = document.getElementById("resetButton");
+      const gridShow = document.getElementById("gridShow");
 
       headerTab.addEventListener("click", () => {
         imageGridContainer.style.display = "none";
@@ -167,9 +179,18 @@
             window.innerWidth / imageWidth,
             window.innerHeight / imageHeight
           );
+          canvasContainer.style.width = `${imageWidth * scaleFactor - 100}px`;
+          canvasContainer.style.height = `${imageHeight * scaleFactor - 100}px`;
           canvas.style.width = `${imageWidth * scaleFactor - 100}px`;
           canvas.style.height = `${imageHeight * scaleFactor - 100}px`;
+          gridCanvas.style.width = `${imageWidth * scaleFactor - 100}px`;
+          gridCanvas.style.height = `${imageHeight * scaleFactor - 100}px`;
+
           rect = canvas.getBoundingClientRect();
+
+          gridCanvas.width = rect.width;
+          gridCanvas.height = rect.height;
+
           scaleX = canvas.width / rect.width;
           scaleY = canvas.height / rect.height;
           xProfileCanvas.width = rect.width;
@@ -177,10 +198,14 @@
           document.querySelector(
             ".header-container"
           ).style.width = `${rect.width}px`;
+
+          if (showGrid) {
+            drawWCSGrid();
+          }
         }
       });
 
-      canvas.addEventListener("contextmenu", (event) => {
+      canvasContainer.addEventListener("contextmenu", (event) => {
         event.preventDefault();
 
         // If there's already an active context menu, remove it first
@@ -278,6 +303,32 @@
         });
 
         contextMenu.appendChild(saveOption);
+        const coords = eventToImageCoords(event.clientX, event.clientY);
+        if (
+          wcs &&
+          coords &&
+          coords.px >= 0 &&
+          coords.px <= imageWidth &&
+          coords.py >= 0 &&
+          coords.py <= imageHeight
+        ) {
+          const simbadOption = document.createElement("div");
+          simbadOption.textContent = "Query SIMBAD here";
+          simbadOption.style.cursor = "pointer";
+          simbadOption.style.padding = "3px";
+          addHoverEffect(simbadOption);
+
+          simbadOption.addEventListener("click", () => {
+            const radec = wcs.sipPixelxy2radec(coords.px, coords.py);
+            if (!radec) return;
+            const [raDeg, decDeg] = radec;
+            const url = buildSimbadUrl(raDeg, decDeg);
+            vscode.postMessage({ command: "openExternal", url });
+          });
+
+          contextMenu.appendChild(simbadOption);
+        }
+
         document.body.appendChild(contextMenu);
 
         // Set this as the active context menu
@@ -297,6 +348,17 @@
           { once: true }
         );
       });
+      gridShow.addEventListener("click", () => {
+        if (!wcs) return;
+        showGrid = !showGrid;
+        if (showGrid) {
+          drawWCSGrid();
+          gridShow.textContent = "hide grid";
+        } else {
+          gridCtx.clearRect(0, 0, gridCtx.canvas.width, gridCtx.canvas.height);
+          gridShow.textContent = "show grid";
+        }
+      });
 
       const mutationObserver = new MutationObserver(
         (mutationsList, observer) => {
@@ -308,6 +370,58 @@
         childList: false,
         attributes: true,
       });
+
+      function toSexagesimal(raDeg, decDeg) {
+        const raHours = raDeg / 15;
+        const rah = Math.floor(raHours);
+        const ram = Math.floor((raHours - rah) * 60);
+        const ras = ((raHours - rah) * 60 - ram) * 60;
+
+        const sign = decDeg < 0 ? "-" : "+";
+        const absDec = Math.abs(decDeg);
+        const decd = Math.floor(absDec);
+        const decm = Math.floor((absDec - decd) * 60);
+        const decs = ((absDec - decd) * 60 - decm) * 60;
+
+        const raStr = `${String(rah).padStart(2, "0")}:${String(ram).padStart(
+          2,
+          "0"
+        )}:${ras.toFixed(3).padStart(6, "0")}`;
+        const decStr = `${sign}${String(decd).padStart(2, "0")}:${String(
+          decm
+        ).padStart(2, "0")}:${decs.toFixed(2).padStart(5, "0")}`;
+
+        return `${raStr}${decStr}`;
+      }
+
+      function buildSimbadUrl(raDeg, decDeg) {
+        const coord = toSexagesimal(raDeg, decDeg);
+        const params = new URLSearchParams({
+          Coord: coord,
+          Radius: "10",
+          "Radius.unit": "arcsec",
+        });
+        return `https://simbad.cfa.harvard.edu/simbad/sim-coo?${params.toString()}`;
+      }
+
+      function eventToImageCoords(clientX, clientY) {
+        if (!rect) return null;
+        const x = (clientX - rect.left) * scaleX;
+        const y = (clientY - rect.top) * scaleY;
+        const px = (x - currentTransform.x * scaleX) / currentTransform.k;
+        const py = (y - currentTransform.y * scaleY) / currentTransform.k;
+        return { px, py };
+      }
+
+      function updateGridToggleVisibility(hasWcs) {
+        if (!gridShow) return;
+        showGrid = false;
+        gridCtx.clearRect(0, 0, gridCtx.canvas.width, gridCtx.canvas.height);
+        gridShow.style.display = hasWcs ? "block" : "none";
+        gridShow.textContent = "show grid";
+      }
+
+      updateGridToggleVisibility(false);
 
       function updateColor() {
         const styles = getComputedStyle(document.querySelector("html"));
@@ -435,6 +549,239 @@
         profileCtx.stroke();
       }
 
+      function drawWCSGrid() {
+        const ctx = gridCtx;
+        const canvas = ctx.canvas;
+
+        // clear
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // view parameters
+        const k = currentTransform.k;
+        const xWidth = imageWidth / k;
+        const yHeight = imageHeight / k;
+        const left = (-currentTransform.x * scaleX) / k;
+        const top = (-currentTransform.y * scaleY) / k;
+
+        // Determine WCS bounds slightly larger than the view
+        // (margin is used to avoid cutting grid lines at the edges)
+        const margin = 0.1;
+        let [ramin, ramax, decmin, decmax] = wcs.sipGetRadecBounds(
+          50 / k,
+          left - xWidth * margin,
+          top - yHeight * margin,
+          xWidth * (1 + 2 * margin),
+          yHeight * (1 + 2 * margin)
+        );
+
+        // Grid sampling parameters
+        const pixScale = wcs.tanPixelScale(); // arcsec / pixel
+        const lineStep = 50;
+
+        // Adaptive sampling step (in degrees)
+        const arcsecStep = pixScale * (lineStep / k);
+        const step = arcsecStep / 3600;
+
+        // Grid spacing for labels (RA / Dec)
+        const rastep = calculateGridTicks((ramax - ramin) / (1 + 2 * margin));
+        const decstep = calculateGridTicks(
+          (decmax - decmin) / (1 + 2 * margin)
+        );
+
+        // Drawing setup
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+
+        // RA grid lines
+        for (
+          let ra = rastep * Math.floor(ramin / rastep);
+          ra <= rastep * Math.ceil(ramax / rastep);
+          ra += rastep
+        ) {
+          if (ra >= rastep * Math.floor(ramin / rastep) + 360) continue;
+
+          let lastOk = false;
+          let lastX = null;
+          let lastY = null;
+
+          // Intersection points with canvas edges (for labels)
+          const hits = [];
+
+          const n = Math.ceil((decmax - decmin) / step) + 2;
+          for (let i = 0; i <= n; i++) {
+            const rawDec = decmin + (i - 1) * step;
+
+            // Clamp Dec to physical limits
+            const dec = Math.max(-90, Math.min(90, rawDec));
+
+            // WCS projection (RA,Dec -> pixel)
+            const xy = wcs.sipRadec2Pixelxy(ra, dec);
+            if (!xy) {
+              lastOk = false;
+              continue;
+            }
+
+            // Convert image pixel coords -> canvas coords
+            const x = ((xy[0] - left) / (imageWidth / k)) * canvas.width;
+            const y = ((xy[1] - top) / (imageHeight / k)) * canvas.height;
+
+            // Track intersections with canvas edges
+            if (lastX !== null && lastY !== null) {
+              const hits_ = intersect(
+                x,
+                y,
+                lastX,
+                lastY,
+                canvas.width,
+                canvas.height
+              );
+              hits.push(...hits_);
+            }
+
+            // Draw continuous line segments only when projection is valid
+            if (lastOk) ctx.lineTo(x, y);
+            else ctx.moveTo(x, y);
+
+            lastOk = true;
+            lastX = x;
+            lastY = y;
+
+            // Stop once we pass the north pole
+            if (rawDec > 90) break;
+          }
+
+          // Label placement priority for RA lines
+          const priorityRA = ["bottom", "right", "top", "left"];
+          const hit = selectHitByPriority(
+            hits,
+            priorityRA,
+            canvas.width,
+            canvas.height
+          );
+          if (hit) {
+            drawLabel(ctx, hit, formatRa(ra, rastep));
+          }
+        }
+
+        // Dec grid lines
+        for (
+          let dec = decstep * Math.floor(decmin / decstep);
+          dec <= decstep * Math.ceil(decmax / decstep);
+          dec += decstep
+        ) {
+          // Skip invalid declinations
+          if (Math.abs(dec) >= 90) continue;
+
+          // Normalize RA sampling density.
+          const cosDec = Math.cos((dec * Math.PI) / 180);
+          const rastepLocal = step / Math.max(0.1, cosDec);
+
+          let lastOk = false;
+          let lastX = null;
+          let lastY = null;
+
+          // Intersection points with canvas edges (for labels)
+          const hits = [];
+
+          const n = Math.ceil((ramax - ramin) / rastepLocal) + 2;
+          for (let i = 0; i <= n; i++) {
+            const rawRa = ramin + (i - 1) * rastepLocal;
+
+            // Limit RA to one full wrap to avoid infinite looping
+            const ra = Math.max(ramin, Math.min(ramin + 360, rawRa));
+
+            // WCS projection (RA,Dec -> pixel)
+            const xy = wcs.sipRadec2Pixelxy(ra, dec);
+            if (!xy) {
+              lastOk = false;
+              continue;
+            }
+
+            // Convert image pixel coords -> canvas coords
+            const x = ((xy[0] - left) / (imageWidth / k)) * canvas.width;
+            const y = ((xy[1] - top) / (imageHeight / k)) * canvas.height;
+
+            // Track intersections with canvas edges
+            if (lastX !== null && lastY !== null) {
+              const hits_ = intersect(
+                x,
+                y,
+                lastX,
+                lastY,
+                canvas.width,
+                canvas.height
+              );
+              hits.push(...hits_);
+            }
+
+            // Draw continuous line segments only when projection is valid
+            if (lastOk) ctx.lineTo(x, y);
+            else ctx.moveTo(x, y);
+
+            lastOk = true;
+            lastX = x;
+            lastY = y;
+
+            // Stop after one full RA range
+            if (rawRa - ramin > 360) break;
+          }
+
+          // Label placement priority for Dec lines
+          const priorityDec = ["left", "top", "right", "bottom"];
+          const hit = selectHitByPriority(
+            hits,
+            priorityDec,
+            canvas.width,
+            canvas.height
+          );
+          if (hit) {
+            drawLabel(ctx, hit, formatDec(dec, decstep));
+          }
+        }
+
+        ctx.stroke();
+      }
+
+      function drawLabel(ctx, hit, text) {
+        ctx.save();
+        ctx.fillStyle = "white";
+        ctx.font = `12px sans-serif`;
+        ctx.textBaseline = "bottom";
+        ctx.translate(hit.x, hit.y);
+        ctx.rotate(hit.angle);
+
+        // Padding for label placement
+        const pad = 18;
+
+        // Draw label
+        switch (hit.edge) {
+          case "top":
+            const alignRight = Math.sin(hit.angle) <= 0;
+            ctx.textAlign = alignRight ? "right" : "left";
+            ctx.fillText(text, alignRight ? -pad : pad, -2);
+            break;
+
+          case "bottom":
+            const alignLeft = Math.sin(hit.angle) <= 0;
+            ctx.textAlign = alignLeft ? "left" : "right";
+            ctx.fillText(text, alignLeft ? pad : -pad, -2);
+            break;
+
+          case "left":
+            ctx.textAlign = "left";
+            ctx.fillText(text, pad, -2);
+            break;
+
+          case "right":
+            ctx.textAlign = "right";
+            ctx.fillText(text, -pad, -2);
+            break;
+        }
+
+        ctx.restore();
+      }
+
       async function renderMonochromeImage(fileUri) {
         // Step 1: Read the FITS file
         console.time("renderMonochromeImage");
@@ -454,6 +801,15 @@
         displayHeaderTable(headerData);
 
         console.timeLog("renderMonochromeImage", "FITS header and data parsed");
+
+        try {
+          wcs = new WCS(headerData);
+        } catch (err) {
+          console.error("WCS init failed:", err);
+          wcs = null;
+        }
+
+        updateGridToggleVisibility(Boolean(wcs));
 
         try {
           // Get the pixel pitch and focal length from the FITS header
@@ -515,8 +871,12 @@
           window.innerWidth / imageWidth,
           window.innerHeight / imageHeight
         );
+        canvasContainer.style.width = `${imageWidth * scaleFactor - 100}px`;
+        canvasContainer.style.height = `${imageHeight * scaleFactor - 100}px`;
         canvas.style.width = `${imageWidth * scaleFactor - 100}px`;
         canvas.style.height = `${imageHeight * scaleFactor - 100}px`;
+        gridCanvas.style.width = `${imageWidth * scaleFactor - 100}px`;
+        gridCanvas.style.height = `${imageHeight * scaleFactor - 100}px`;
 
         spinner.style.display = "none";
         mainContainer.style.display = "grid";
@@ -524,6 +884,9 @@
         rect = canvas.getBoundingClientRect();
         scaleX = canvas.width / rect.width;
         scaleY = canvas.height / rect.height;
+
+        gridCanvas.width = rect.width;
+        gridCanvas.height = rect.height;
 
         // set width and height of line profile canvases
         xProfileCanvas.width = rect.width;
@@ -535,7 +898,7 @@
         ).style.width = `${rect.width}px`;
 
         // Add mousemove event listener to show pixel value and line profiles
-        canvas.addEventListener("mousemove", (event) => {
+        canvasContainer.addEventListener("mousemove", (event) => {
           imageInteractionHandler(event, imageWidth, imageHeight);
         });
 
@@ -702,9 +1065,13 @@
             // Redraw the original image with the appropriate transformation
             ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
             ctx.restore();
+
+            if (showGrid) {
+              drawWCSGrid();
+            }
           });
 
-        d3.select(canvas).call(zoom);
+        d3.select(canvasContainer).call(zoom);
       }
 
       console.time("loadData");
