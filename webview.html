@@ -801,6 +801,7 @@
         try {
           wcs = new WCS(headerData);
         } catch (err) {
+          console.error("WCS init failed:", err);
           wcs = null;
         }
 

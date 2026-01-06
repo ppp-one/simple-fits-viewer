@@ -321,18 +321,38 @@ function parseHeaderInt(header, key, fallback = -1) {
     return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+function parseHeaderFloat(header, key, fallback = NaN) {
+    const raw = header[key];
+    if (raw === undefined) {
+        return fallback;
+    }
+    const parsed = parseFloat(raw.split("/")[0]);
+    return Number.isNaN(parsed) ? fallback : parsed;
+}
+
 
 class WCS {
     // Parse WCS header
     // check if wcs is included
     constructor(header) {
-        this.wcsaxes = parseInt(header["WCSAXES"].split("/")[0], 10);
-        this.ctype1 = header["CTYPE1"].split("/")[0].trim();
-        this.ctype2 = header["CTYPE2"].split("/")[0].trim();
+        const rawCtype1 = header["CTYPE1"];
+        const rawCtype2 = header["CTYPE2"];
+        if (!rawCtype1 || !rawCtype2) {
+            throw new Error("Missing CTYPE1/CTYPE2 in WCS header");
+        }
 
-        if (this.ctype1.startsWith("RA---SIN") && this.ctype2.startsWith("DEC---SIN")) {
+        this.wcsaxes = parseHeaderInt(header, "WCSAXES", 2);
+        this.ctype1 = rawCtype1.split("/")[0].trim();
+        this.ctype2 = rawCtype2.split("/")[0].trim();
+
+        const ctype1Upper = this.ctype1.toUpperCase();
+        const ctype2Upper = this.ctype2.toUpperCase();
+        const isSin = ctype1Upper.includes("SIN") && ctype2Upper.includes("SIN");
+        const isTan = ctype1Upper.includes("TAN") && ctype2Upper.includes("TAN");
+
+        if (isSin) {
             this.sin = true;
-        } else if (this.ctype1.startsWith("RA---TAN") && this.ctype2.startsWith("DEC---TAN")) {
+        } else if (isTan) {
             this.sin = false;
         } else {
             console.error(`Unsupported wcs format: ${this.ctype1}`);
@@ -347,29 +367,49 @@ class WCS {
             header["BP_ORDER"]
         );
 
-        this.equinox = parseFloat(header["EQUINOX"].split("/")[0]);
-        this.lonpole = parseFloat(header["LONPOLE"].split("/")[0]);
-        this.latpole = parseFloat(header["LATPOLE"].split("/")[0]);
+        this.equinox = parseHeaderFloat(header, "EQUINOX", 2000);
+        this.lonpole = parseHeaderFloat(header, "LONPOLE", 180.0);
+        this.latpole = parseHeaderFloat(header, "LATPOLE", 0.0);
 
         this.crval = [];
-        this.crval.push(parseFloat(header["CRVAL1"].split("/")[0]));
-        this.crval.push(parseFloat(header["CRVAL2"].split("/")[0]));
+        this.crval.push(parseHeaderFloat(header, "CRVAL1"));
+        this.crval.push(parseHeaderFloat(header, "CRVAL2"));
 
         this.crpix = [];
-        this.crpix.push(parseFloat(header["CRPIX1"].split("/")[0]));
-        this.crpix.push(parseFloat(header["CRPIX2"].split("/")[0]));
+        this.crpix.push(parseHeaderFloat(header, "CRPIX1"));
+        this.crpix.push(parseHeaderFloat(header, "CRPIX2"));
 
-        this.cunit1 = header["CUNIT1"].split("/")[0];
-        this.cunit2 = header["CUNIT2"].split("/")[0];
+        this.cunit1 = (header["CUNIT1"] || "deg").split("/")[0];
+        this.cunit2 = (header["CUNIT2"] || "deg").split("/")[0];
 
-        this.cd = new Array(2).fill(0).map(() => new Array(2).fill(0));
-        this.cd[0][0] = parseFloat(header["CD1_1"].split("/")[0]);
-        this.cd[0][1] = parseFloat(header["CD1_2"].split("/")[0]);
-        this.cd[1][0] = parseFloat(header["CD2_1"].split("/")[0]);
-        this.cd[1][1] = parseFloat(header["CD2_2"].split("/")[0]);
+        // Build CD matrix: prefer CD*, else PC*CDELT fallback
+        const cd11 = parseHeaderFloat(header, "CD1_1");
+        const cd12 = parseHeaderFloat(header, "CD1_2");
+        const cd21 = parseHeaderFloat(header, "CD2_1");
+        const cd22 = parseHeaderFloat(header, "CD2_2");
+        const hasCD = [cd11, cd12, cd21, cd22].every(Number.isFinite);
 
-        this.imagew = parseInt(header["IMAGEW"].split("/")[0], 10);
-        this.imageh = parseInt(header["IMAGEH"].split("/")[0], 10);
+        if (hasCD) {
+            this.cd = [[cd11, cd12], [cd21, cd22]];
+        } else {
+            const cdelt1 = parseHeaderFloat(header, "CDELT1", 1.0);
+            const cdelt2 = parseHeaderFloat(header, "CDELT2", 1.0);
+            const pc11 = parseHeaderFloat(header, "PC1_1", 1.0);
+            const pc12 = parseHeaderFloat(header, "PC1_2", 0.0);
+            const pc21 = parseHeaderFloat(header, "PC2_1", 0.0);
+            const pc22 = parseHeaderFloat(header, "PC2_2", 1.0);
+            if ([cdelt1, cdelt2, pc11, pc12, pc21, pc22].every(Number.isFinite)) {
+                this.cd = [
+                    [pc11 * cdelt1, pc12 * cdelt1],
+                    [pc21 * cdelt2, pc22 * cdelt2],
+                ];
+            } else {
+                throw new Error("Missing CD or PC/CDELT WCS matrix terms");
+            }
+        }
+
+        this.imagew = parseHeaderInt(header, "IMAGEW", parseHeaderInt(header, "NAXIS1", -1));
+        this.imageh = parseHeaderInt(header, "IMAGEH", parseHeaderInt(header, "NAXIS2", -1));
 
         this.aorder = hasSipCoeffs ? parseHeaderInt(header, "A_ORDER") : -1;
         this.a = this.aorder >= 0 ? parseWCSPolynomial(header, "A", this.aorder) : null;
