@@ -311,22 +311,41 @@ function parseWCSPolynomial(header, name, order) {
     return data;
 }
 
+function parseHeaderInt(header, key, fallback = -1) {
+    const raw = header[key];
+    if (raw === undefined) {
+        return fallback;
+    }
+
+    const parsed = parseInt(raw.split("/")[0], 10);
+    return Number.isNaN(parsed) ? fallback : parsed;
+}
+
 
 class WCS {
     // Parse WCS header
     // check if wcs is included
     constructor(header) {
         this.wcsaxes = parseInt(header["WCSAXES"].split("/")[0], 10);
-        this.ctype1 = header["CTYPE1"].split("/")[0];
-        this.ctype2 = header["CTYPE2"].split("/")[0];
+        this.ctype1 = header["CTYPE1"].split("/")[0].trim();
+        this.ctype2 = header["CTYPE2"].split("/")[0].trim();
 
-        if (this.ctype1 == "RA---SIN-SIP" && this.ctype2 == "DEC---SIN-SIP") {
+        if (this.ctype1.startsWith("RA---SIN") && this.ctype2.startsWith("DEC---SIN")) {
             this.sin = true;
-        } else if (this.ctype1 == "RA---TAN-SIP" && this.ctype2 == "DEC---TAN-SIP") {
+        } else if (this.ctype1.startsWith("RA---TAN") && this.ctype2.startsWith("DEC---TAN")) {
             this.sin = false;
         } else {
             console.error(`Unsupported wcs format: ${this.ctype1}`);
         }
+
+        const hasSipCoeffs = Boolean(
+            this.ctype1.includes("-SIP") ||
+            this.ctype2.includes("-SIP") ||
+            header["A_ORDER"] ||
+            header["B_ORDER"] ||
+            header["AP_ORDER"] ||
+            header["BP_ORDER"]
+        );
 
         this.equinox = parseFloat(header["EQUINOX"].split("/")[0]);
         this.lonpole = parseFloat(header["LONPOLE"].split("/")[0]);
@@ -352,14 +371,14 @@ class WCS {
         this.imagew = parseInt(header["IMAGEW"].split("/")[0], 10);
         this.imageh = parseInt(header["IMAGEH"].split("/")[0], 10);
 
-        this.aorder = parseInt(header["A_ORDER"].split("/")[0], 10);
-        this.a = parseWCSPolynomial(header, "A", this.aorder);
-        this.border = parseInt(header["B_ORDER"].split("/")[0], 10);
-        this.b = parseWCSPolynomial(header, "B", this.border);
-        this.aporder = parseInt(header["AP_ORDER"].split("/")[0], 10);
-        this.ap = parseWCSPolynomial(header, "AP", this.aporder);
-        this.bporder = parseInt(header["BP_ORDER"].split("/")[0], 10);
-        this.bp = parseWCSPolynomial(header, "BP", this.aporder);
+        this.aorder = hasSipCoeffs ? parseHeaderInt(header, "A_ORDER") : -1;
+        this.a = this.aorder >= 0 ? parseWCSPolynomial(header, "A", this.aorder) : null;
+        this.border = hasSipCoeffs ? parseHeaderInt(header, "B_ORDER") : -1;
+        this.b = this.border >= 0 ? parseWCSPolynomial(header, "B", this.border) : null;
+        this.aporder = hasSipCoeffs ? parseHeaderInt(header, "AP_ORDER") : -1;
+        this.ap = this.aporder >= 0 ? parseWCSPolynomial(header, "AP", this.aporder) : null;
+        this.bporder = hasSipCoeffs ? parseHeaderInt(header, "BP_ORDER") : -1;
+        this.bp = this.bporder >= 0 ? parseWCSPolynomial(header, "BP", this.bporder) : null;
     }
 
     sipGetRadecBounds(stepsize, x = 0, y = 0, w = this.imagew, h = this.imageh) {
@@ -448,7 +467,7 @@ class WCS {
     }
 
     hasDistortions() {
-        return this.aorder >= 0;
+        return this.aorder >= 0 || this.border >= 0 || this.aporder >= 0 || this.bporder >= 0;
     }
 
     sipPixelxy2radec(px, py) {
