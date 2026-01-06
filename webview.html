@@ -759,19 +759,19 @@
           case "bottom":
             const rightSide = Math.sin(hit.angle) <= 0;
             ctx.textAlign = rightSide ? "left" : "right";
-            ctx.fillText(text, rightSide ? pad : -pad, 0);
+            ctx.fillText(text, rightSide ? pad : -pad, -2);
             break;
 
           case "left":
             ctx.textAlign = "left";
             ctx.textBaseline = "bottom";
-            ctx.fillText(text, pad, 0);
+            ctx.fillText(text, pad, -2);
             break;
 
           case "right":
             ctx.textAlign = "right";
             ctx.textBaseline = "bottom";
-            ctx.fillText(text, -pad, 0);
+            ctx.fillText(text, -pad, -2);
             break;
         }
 
