@@ -53,6 +53,14 @@ class FITSFileEditor {
                                 fileUri: fitsFileUri.toString()
                             });
                         }
+
+                        if (message.command === 'openExternal' && message.url) {
+                            try {
+                                vscode.env.openExternal(vscode.Uri.parse(message.url));
+                            } catch (err) {
+                                vscode.window.showErrorMessage(`Failed to open external link: ${err.message}`);
+                            }
+                        }
                     },
                     undefined,
                     this.context.subscriptions
