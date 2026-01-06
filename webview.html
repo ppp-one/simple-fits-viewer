@@ -114,6 +114,7 @@
       let filename = null;
       let activeContextMenu = null;
       let showGrid = false;
+      let wcs = null;
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
@@ -125,6 +126,7 @@
       const headerTable = document.getElementById("headerTable");
       const searchInput = document.getElementById("searchInput");
       const resetButton = document.getElementById("resetButton");
+      const gridShow = document.getElementById("gridShow");
 
       headerTab.addEventListener("click", () => {
         imageGridContainer.style.display = "none";
@@ -350,6 +352,16 @@
         childList: false,
         attributes: true,
       });
+
+      function updateGridToggleVisibility(hasWcs) {
+        if (!gridShow) return;
+        showGrid = false;
+        gridCtx.clearRect(0, 0, gridCtx.canvas.width, gridCtx.canvas.height);
+        gridShow.style.display = hasWcs ? "block" : "none";
+        gridShow.textContent = "show grid";
+      }
+
+      updateGridToggleVisibility(false);
 
       function updateColor() {
         const styles = getComputedStyle(document.querySelector("html"));
@@ -696,6 +708,8 @@
         } catch (err) {
           wcs = null;
         }
+
+        updateGridToggleVisibility(Boolean(wcs));
 
 
         try {

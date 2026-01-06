@@ -13,8 +13,8 @@
 
 const ANGULAR_STEPS = [
     30, 20, 15, 10, 5, 2, 1,
-    30/60, 20/60, 15/60, 10/60, 5/60, 2/60, 1/60,
-    30/3600, 20/3600, 15/3600, 10/3600, 5/3600, 2/3600, 1/3600
+    30 / 60, 20 / 60, 15 / 60, 10 / 60, 5 / 60, 2 / 60, 1 / 60,
+    30 / 3600, 20 / 3600, 15 / 3600, 10 / 3600, 5 / 3600, 2 / 3600, 1 / 3600
 ];
 
 function calculateGridTicks(range, targetTicks = 6) {
@@ -34,7 +34,7 @@ function intersect(x1, y1, x2, y2, width, height) {
 
     const dx = x1 - x2;
     const dy = y1 - y2;
-    let angle = Math.atan(dy/dx);
+    let angle = Math.atan(dy / dx);
     // left
     if (x1 * x2 < 0) {
         const t = (0 - x1) / (x2 - x1);
@@ -138,7 +138,7 @@ function formatRa(raDeg, stepDeg) {
     if (scale === 60) {
         const h = Math.floor(total / 60);
         const m = total % 60;
-        return `${h}h${m.toString().padStart(2,"0")}m`;
+        return `${h}h${m.toString().padStart(2, "0")}m`;
     }
 
     const h = Math.floor(total / 3600);
@@ -146,7 +146,7 @@ function formatRa(raDeg, stepDeg) {
     const m = Math.floor(total / 60);
     const s = total % 60;
 
-    return `${h}h${m.toString().padStart(2,"0")}m${s.toString().padStart(2,"0")}s`;
+    return `${h}h${m.toString().padStart(2, "0")}m${s.toString().padStart(2, "0")}s`;
 }
 
 function formatDec(decDeg, stepDeg) {
@@ -164,7 +164,7 @@ function formatDec(decDeg, stepDeg) {
     if (scale === 60) {
         const deg = Math.floor(total / 60);
         const min = total % 60;
-        return `${sign}${deg}°${min.toString().padStart(2,"0")}′`;
+        return `${sign}${deg}°${min.toString().padStart(2, "0")}′`;
     }
 
     // arcsec
@@ -173,19 +173,19 @@ function formatDec(decDeg, stepDeg) {
     const min = Math.floor(total / 60);
     const sec = total % 60;
 
-    return `${sign}${deg}°${min.toString().padStart(2,"0")}′${sec.toString().padStart(2,"0")}″`;
+    return `${sign}${deg}°${min.toString().padStart(2, "0")}′${sec.toString().padStart(2, "0")}″`;
 }
 
 const deg2arcsec = (deg) => deg * 3600.0;
 const deg2rad = (deg) => deg * (Math.PI / 180);
-const radec2x = (r,d) => Math.cos(d)*Math.cos(r);
-const radec2y = (r,d) => Math.cos(d)*Math.sin(r);
-const radec2z = (r,d) => Math.sin(d);
-const radec2xyz = (r,d) => [radec2x(r,d), radec2y(r,d), radec2z(r,d)];
-const radecdeg2xyz = (r,d) => radec2xyz(deg2rad(r), deg2rad(d));
+const radec2x = (r, d) => Math.cos(d) * Math.cos(r);
+const radec2y = (r, d) => Math.cos(d) * Math.sin(r);
+const radec2z = (r, d) => Math.sin(d);
+const radec2xyz = (r, d) => [radec2x(r, d), radec2y(r, d), radec2z(r, d)];
+const radecdeg2xyz = (r, d) => radec2xyz(deg2rad(r), deg2rad(d));
 
 function normalize(x, y, z) {
-	let invl = 1.0 / Math.sqrt(x*x + y*y + z*z);
+    let invl = 1.0 / Math.sqrt(x * x + y * y + z * z);
     return [x * invl, y * invl, z * invl];
 }
 
@@ -243,16 +243,16 @@ function starCoords(s, r, tangent) {
         let invs2 = 1.0 / s[2];
         if (tangent) {
             x = -s[0] * invs2;
-            y =  s[1] * invs2;
+            y = s[1] * invs2;
         } else {
             x = -s[0];
-            y =  s[1];
+            y = s[1];
         }
     } else {
         // eta is a vector perpendicular to r pointing in the direction
         // of increasing RA.  eta_z = 0 by definition.
         let etax = -r[1];
-        let etay =  r[0];
+        let etay = r[0];
         let etanorm = Math.hypot(etax, etay);
         let inven = 1.0 / etanorm;
         etax *= inven;
@@ -261,13 +261,13 @@ function starCoords(s, r, tangent) {
         // xi =  r cross eta, a vector pointing northwards,
         // in direction of increasing DEC
         let xix = -r[2] * etay;
-        let xiy =  r[2] * etax;
-        let xiz =  r[0] * etay - r[1] * etax;
+        let xiy = r[2] * etax;
+        let xiz = r[0] * etay - r[1] * etax;
 
         // project s-r onto eta and xi.  No need to subtract r from s, though,
         // since eta and xi are orthogonal to r by construction.
-        x = (s[0] * etax + s[1] * etay             );
-        y = (s[0] *  xix + s[1] *  xiy + s[2] * xiz);
+        x = (s[0] * etax + s[1] * etay);
+        y = (s[0] * xix + s[1] * xiy + s[2] * xiz);
 
         // The "inv_sdotr" applies the TAN scaling
         if (tangent) {
@@ -288,10 +288,10 @@ function invert2by2Arr(a) {
     }
 
     let invdet = 1.0 / det;
-    ainv[0][0] =  a[1][1] * invdet;
+    ainv[0][0] = a[1][1] * invdet;
     ainv[0][1] = -a[0][1] * invdet;
     ainv[1][0] = -a[1][0] * invdet;
-    ainv[1][1] =  a[0][0] * invdet;
+    ainv[1][1] = a[0][0] * invdet;
     return ainv;
 }
 
@@ -424,7 +424,7 @@ class WCS {
         let ramax = rac;
         let decmin = decc;
         let decmax = decc;
-        
+
         let xmin = left + 0.5;
         let xmax = left + w + 0.5;
         let ymin = top + 0.5;
@@ -433,7 +433,7 @@ class WCS {
         let offsety = [ymin, ymin, ymax, ymax];
         let stepx = [+stepsize, 0, -stepsize, 0];
         let stepy = [0, +stepsize, 0, -stepsize];
-        let nsteps = [Math.ceil(w/stepsize) + 1, Math.ceil(h/stepsize) + 1, Math.ceil(w/stepsize) + 1, Math.ceil(h/stepsize) + 1 ];
+        let nsteps = [Math.ceil(w / stepsize) + 1, Math.ceil(h / stepsize) + 1, Math.ceil(w / stepsize) + 1, Math.ceil(h / stepsize) + 1];
 
         for (let side = 0; side < 4; side++) {
             for (let i = 0; i < nsteps[side]; i++) {
@@ -451,7 +451,7 @@ class WCS {
                     // wrap-around: racenter > 180, ra has gone > 360 but wrapped around to > 0.
                     ra += 360;
                 }
-            
+
                 ramin = Math.min(ramin, ra);
                 ramax = Math.max(ramax, ra);
             }
@@ -491,7 +491,7 @@ class WCS {
         return xy;
     }
 
-    sipCalcDistortion(u, v) {    
+    sipCalcDistortion(u, v) {
         let fuv = 0.0;
         let guv = 0.0;
 
@@ -500,15 +500,15 @@ class WCS {
         const powv = new Array(10).fill(0.0);
 
         powu[0] = 1.0;
-        powu[1] = u; 
+        powu[1] = u;
         powv[0] = 1.0;
-        powv[1] = v; 
+        powv[1] = v;
 
         for (let i = 2; i <= Math.max(this.aorder, this.border); i++) {
             powu[i] = powu[i - 1] * u; // u^i = u^(i-1) * u
             powv[i] = powv[i - 1] * v; // v^i = v^(i-1) * v
         }
-        
+
         for (let i = 0; i <= this.aorder; i++) {
             for (let j = 0; j <= this.aorder; j++) {
                 // We include all terms, even the constant and linear ones; the standard
@@ -538,14 +538,14 @@ class WCS {
         if (this.aorder != 0 && this.aporder == 0) {
             console.error("suspicious inversion; no inverse SIP coeffs yet there are forward SIP coeffs");
         }
-    
+
         // Get pixel coordinates relative to reference pixel
         let u = x - this.crpix[0];
         let v = y - this.crpix[1];
         [x, y] = this.sipCalcInvDistortion(u, v);
         x += this.crpix[0];
         y += this.crpix[1];
-        return [x, y]; 
+        return [x, y];
     }
 
     sipCalcInvDistortion(u, v) {
@@ -557,9 +557,9 @@ class WCS {
         const powv = new Array(10).fill(0.0);
 
         powu[0] = 1.0;
-        powu[1] = u; 
+        powu[1] = u;
         powv[0] = 1.0;
-        powv[1] = v; 
+        powv[1] = v;
 
         for (let i = 2; i <= Math.max(this.aporder, this.bporder); i++) {
             powu[i] = powu[i - 1] * u; // u^i = u^(i-1) * u
@@ -597,19 +597,18 @@ class WCS {
         return [x, y]
     }
 
-    tanIwc2xyzarr(x, y)
-    {
-        let ix,iy,norm;
-        let jx,jy,jz;
+    tanIwc2xyzarr(x, y) {
+        let ix, iy, norm;
+        let jx, jy, jz;
         let xyz = [0, 0, 0];
-    
+
         // Mysterious factor of -1 correcting for vector directions below.
         x = -deg2rad(x);
-        y =  deg2rad(y);
+        y = deg2rad(y);
 
         // Take r to be the threespace vector of crval
         let [rx, ry, rz] = radecdeg2xyz(this.crval[0], this.crval[1]);
-    
+
         // FIXME -- what about *near* the poles?
         if (rx == 1.0) {
             // North pole
@@ -628,29 +627,29 @@ class WCS {
             ix /= norm;
             iy /= norm;
         }
-    
+
         // Form j = i cross r;   iz=0 so some terms drop out
         jx = iy * rz;
-        jy =         - ix * rz;
+        jy = - ix * rz;
         jz = ix * ry - iy * rx;
         // norm should already be 1, but normalize anyway
         let [jx_, jy_, jz_] = normalize(jx, jy, jz);
-    
+
         if (this.sin) {
-            console.assert((x*x + y*y) < 1.0);
+            console.assert((x * x + y * y) < 1.0);
             // Figure out what factor of r we have to add in to make the resulting length = 1
-            let rfrac = Math.sqrt(1.0 - (x*x + y*y));
+            let rfrac = Math.sqrt(1.0 - (x * x + y * y));
             // Don't scale the projected x,y positions, just add in the right amount of r to
             // bring it onto the unit sphere
-            xyz[0] = ix*x + jx_*y + rx * rfrac;
-            xyz[1] = iy*x + jy_*y + ry * rfrac;
-            xyz[2] =        jz_*y + rz * rfrac; // iz = 0
+            xyz[0] = ix * x + jx_ * y + rx * rfrac;
+            xyz[1] = iy * x + jy_ * y + ry * rfrac;
+            xyz[2] = jz_ * y + rz * rfrac; // iz = 0
             return xyz;
         } else {
             // Form the point on the tangent plane relative to observation point,
-            xyz[0] = ix*x + jx_*y + rx;
-            xyz[1] = iy*x + jy_*y + ry;
-            xyz[2] =        jz_*y + rz; // iz = 0
+            xyz[0] = ix * x + jx_ * y + rx;
+            xyz[1] = iy * x + jy_ * y + ry;
+            xyz[2] = jz_ * y + rz; // iz = 0
             // and normalize back onto the unit sphere
             return normalize(xyz[0], xyz[1], xyz[2]);
         }
@@ -667,7 +666,7 @@ class WCS {
     }
 
     tanRadec2pixelxy(a, d) {
-        let xyzpt = radecdeg2xyz(a,d);
+        let xyzpt = radecdeg2xyz(a, d);
         return this.tanxyzArr2Pixelxy(xyzpt);
     }
 
@@ -699,8 +698,8 @@ class WCS {
         let cdi = invert2by2Arr(this.cd);
 
         // Linear pixel coordinates
-        let u = cdi[0][0]*x + cdi[0][1]*y;
-        let v = cdi[1][0]*x + cdi[1][1]*y;
+        let u = cdi[0][0] * x + cdi[0][1] * y;
+        let v = cdi[1][0] * x + cdi[1][1] * y;
 
         // Re-add crpix to get pixel coordinates
         let px = u + this.crpix[0];
@@ -719,6 +718,6 @@ class WCS {
     }
 
     tanDetCd() {
-        return (this.cd[0][0]*this.cd[1][1] - this.cd[0][1]*this.cd[1][0]);
+        return (this.cd[0][0] * this.cd[1][1] - this.cd[0][1] * this.cd[1][0]);
     }
 }
