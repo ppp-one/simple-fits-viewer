@@ -11,6 +11,51 @@
       <div id="spinner"></div>
     </div>
     <div class="mainContainer" style="display: none">
+      <div id="controlsContainer" style="display: none">
+        <div id="stretchControls" class="stretch-controls">
+          <div class="stretch-header">
+            <span class="stretch-title">Z-scale</span>
+            <div class="stretch-header-actions">
+              <label
+                class="stretch-log"
+                for="logToggleButton"
+                title="Apply logarithmic stretch"
+              >
+                <input id="logToggleButton" type="checkbox" />
+                <span>Log</span>
+              </label>
+              <button id="autoZ" type="button">Auto</button>
+            </div>
+          </div>
+          <label class="stretch-field">
+            <div class="stretch-field-header">
+              <span>Min</span>
+              <span id="stretchMinValue">0.00</span>
+            </div>
+            <input id="stretchMin" type="range" step="any" />
+          </label>
+          <label class="stretch-field">
+            <div class="stretch-field-header">
+              <span>Max</span>
+              <span id="stretchMaxValue">0.00</span>
+            </div>
+            <input id="stretchMax" type="range" step="any" />
+          </label>
+          <label class="stretch-field">
+            <div class="stretch-field-header">
+              <span>Gamma</span>
+              <span id="stretchGammaValue">1.00</span>
+            </div>
+            <input
+              id="stretchGamma"
+              type="range"
+              min="10"
+              max="300"
+              value="100"
+            />
+          </label>
+        </div>
+      </div>
       <div id="imageGridContainer" class="grid-container">
         <div id="canvasContainer">
           <canvas id="loadedImage"></canvas>
@@ -99,6 +144,7 @@
 
       let offscreenCanvas, offscreenCtx;
       let imageWidth, imageHeight;
+      let histogram = null;
       let currentTransform = d3.zoomIdentity;
       let imageData = null;
       let imageDataT = null;
@@ -210,6 +256,19 @@
 
         // If there's already an active context menu, remove it first
         if (activeContextMenu && document.body.contains(activeContextMenu)) {
+          const existingStretch = document.getElementById("stretchControls");
+          if (existingStretch && activeContextMenu.contains(existingStretch)) {
+            existingStretch.classList.remove("menu-active");
+            existingStretch.style.display = "none";
+            // Prefer restoring to the dedicated controls container if present
+            const defaultControlsParent =
+              document.getElementById("controlsContainer") ||
+              document.querySelector(".mainContainer");
+            if (defaultControlsParent) {
+              // append back into the container (controlsContainer is hidden by default)
+              defaultControlsParent.appendChild(existingStretch);
+            }
+          }
           document.body.removeChild(activeContextMenu);
         }
 
@@ -303,7 +362,43 @@
         });
 
         contextMenu.appendChild(saveOption);
+
+        // Move the stretch controls into the context menu while it's open
+        const stretchControlsEl = document.getElementById("stretchControls");
+        const originalStretchParent = stretchControlsEl.parentNode;
+        const originalStretchNext = stretchControlsEl.nextSibling;
+        // ensure the menu is wide enough for sliders
+        contextMenu.style.minWidth = "260px";
+
+        // compute image coords for SIMBAD option
         const coords = eventToImageCoords(event.clientX, event.clientY);
+
+        // add separator line between menu options and sliders (will be added after SIMBAD)
+        const sep = document.createElement("div");
+        sep.style.height = "1px";
+        sep.style.background = "#e6e6e6";
+        sep.style.margin = "6px 0";
+
+        stretchControlsEl.classList.add("menu-active");
+        stretchControlsEl.style.display = "flex";
+
+        const restoreStretchControls = () => {
+          stretchControlsEl.classList.remove("menu-active");
+          stretchControlsEl.style.display = "none";
+          if (originalStretchParent) {
+            if (originalStretchNext) {
+              originalStretchParent.insertBefore(
+                stretchControlsEl,
+                originalStretchNext
+              );
+            } else {
+              originalStretchParent.appendChild(stretchControlsEl);
+            }
+          }
+        };
+
+        // move element into context menu (will appear after separator)
+        // but we want SIMBAD above, so append SIMBAD first if available
         if (
           wcs &&
           coords &&
@@ -327,6 +422,15 @@
           });
 
           contextMenu.appendChild(simbadOption);
+          // append separator and then controls
+          contextMenu.appendChild(sep);
+          contextMenu.appendChild(stretchControlsEl);
+        }
+
+        // if SIMBAD not appended (no WCS/coords), still append separator+controls compactly
+        if (!contextMenu.contains(stretchControlsEl)) {
+          contextMenu.appendChild(sep);
+          contextMenu.appendChild(stretchControlsEl);
         }
 
         document.body.appendChild(contextMenu);
@@ -334,19 +438,40 @@
         // Set this as the active context menu
         activeContextMenu = contextMenu;
 
-        document.addEventListener(
-          "click",
-          () => {
-            if (document.body.contains(contextMenu)) {
-              document.body.removeChild(contextMenu);
-              // Clear the active context menu reference
-              if (activeContextMenu === contextMenu) {
-                activeContextMenu = null;
+        // Close the context menu only when clicking outside it. Keep open for
+        // clicks inside the menu so users can adjust multiple sliders.
+        function onDocClick(e) {
+          // If click is inside the context menu, do nothing
+          if (contextMenu.contains(e.target)) return;
+
+          if (document.body.contains(contextMenu)) {
+            // restore stretch controls to original position and styles
+            try {
+              restoreStretchControls();
+            } catch (err) {
+              // ignore if something changed
+            }
+            // remove separator if it was moved into the document inadvertently
+            if (sep && sep.parentNode && sep.parentNode.removeChild) {
+              try {
+                sep.parentNode.removeChild(sep);
+              } catch (e) {
+                /* ignore */
               }
             }
-          },
-          { once: true }
-        );
+            try {
+              document.body.removeChild(contextMenu);
+            } catch (err) {}
+            // Clear the active context menu reference
+            if (activeContextMenu === contextMenu) {
+              activeContextMenu = null;
+            }
+            // remove this listener now we've closed the menu
+            document.removeEventListener("click", onDocClick);
+          }
+        }
+
+        document.addEventListener("click", onDocClick);
       });
       gridShow.addEventListener("click", () => {
         if (!wcs) return;
@@ -422,6 +547,200 @@
       }
 
       updateGridToggleVisibility(false);
+
+      // Histogram / percentile helpers (computed once per image)
+      function buildHistogram(values, nbins = 4096) {
+        let min = Infinity,
+          max = -Infinity;
+        let n = 0;
+        for (let i = 0; i < values.length; i++) {
+          const v = values[i];
+          if (!Number.isFinite(v)) continue;
+          if (v < min) min = v;
+          if (v > max) max = v;
+          n++;
+        }
+        if (n === 0) return null;
+        if (min === max) {
+          // degenerate: make a small range
+          max = min + 1;
+        }
+        const counts = new Uint32Array(nbins);
+        const binWidth = (max - min) / nbins;
+        for (let i = 0; i < values.length; i++) {
+          const v = values[i];
+          if (!Number.isFinite(v)) continue;
+          let idx = Math.floor((v - min) / binWidth);
+          if (idx < 0) idx = 0;
+          if (idx >= nbins) idx = nbins - 1;
+          counts[idx]++;
+        }
+        // cumulative
+        const cumsum = new Float64Array(nbins);
+        let acc = 0;
+        for (let i = 0; i < nbins; i++) {
+          acc += counts[i];
+          cumsum[i] = acc;
+        }
+        return { min, max, nbins, binWidth, counts, cumsum, total: acc };
+      }
+
+      function valueForPercentile(p) {
+        if (!histogram) return 0;
+        const target = (p / 100) * (histogram.total - 1);
+        const c = histogram.cumsum;
+        // binary search for bin
+        let lo = 0,
+          hi = c.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (c[mid] >= target) hi = mid;
+          else lo = mid + 1;
+        }
+        const binIdx = lo;
+        const binStartCount = binIdx === 0 ? 0 : c[binIdx - 1];
+        const binCount = histogram.counts[binIdx];
+        const frac = binCount === 0 ? 0 : (target - binStartCount) / binCount;
+        const value = histogram.min + (binIdx + frac) * histogram.binWidth;
+        return value;
+      }
+
+      function percentileForValue(v) {
+        if (!histogram) return 0;
+        if (!Number.isFinite(v)) return 0;
+        let idx = Math.floor((v - histogram.min) / histogram.binWidth);
+        if (idx < 0) idx = 0;
+        if (idx >= histogram.nbins) idx = histogram.nbins - 1;
+        const countBefore = idx === 0 ? 0 : histogram.cumsum[idx - 1];
+        const within = histogram.counts[idx];
+        const frac =
+          within === 0
+            ? 0
+            : (v - (histogram.min + idx * histogram.binWidth)) /
+              histogram.binWidth;
+        const rank = countBefore + frac * within;
+        return (rank / (histogram.total - 1)) * 100;
+      }
+
+      // Stretch control elements
+      const autoZ = document.getElementById("autoZ");
+      const stretchMin = document.getElementById("stretchMin");
+      const stretchMax = document.getElementById("stretchMax");
+      const stretchMinValue = document.getElementById("stretchMinValue");
+      const stretchMaxValue = document.getElementById("stretchMaxValue");
+      const stretchGamma = document.getElementById("stretchGamma");
+      const stretchGammaValue = document.getElementById("stretchGammaValue");
+      const logToggleCheckbox = document.getElementById("logToggleButton");
+
+      // Helper to apply stretch to the displayed canvas using the original image data
+      function applyStretch(vmin, vmax, gamma = 1.0, useLog = false) {
+        if (!imageData || !offscreenCtx) return;
+
+        const width = imageWidth;
+        const height = imageHeight;
+        const pixels = offscreenCtx.createImageData(width, height);
+        const out = pixels.data;
+        const range = vmax - vmin || 1;
+
+        // Precompute log denom if needed
+        const logDenom = useLog ? Math.log10(1 + range) : 1;
+
+        for (let i = 0, j = 0; i < imageData.length; i++, j += 4) {
+          const val = imageData[i];
+
+          // Linear scale to 0..1
+          let norm = (val - vmin) / range;
+          if (norm < 0) norm = 0;
+          if (norm > 1) norm = 1;
+
+          if (useLog) {
+            // Clipping aside, the following log stretch is equivalent to
+            // log10(1 + val - vmin) / log10(1 + vmax - vmin)
+            norm = Math.log10(1 + norm * range) / logDenom;
+          }
+
+          // gamma correction (slider value is 100 -> gamma 1.0)
+          const g = gamma <= 0 ? 1 : gamma;
+          norm = Math.pow(norm, 1 / g);
+
+          const c = Math.round(norm * 255);
+          out[j] = c;
+          out[j + 1] = c;
+          out[j + 2] = c;
+          out[j + 3] = 255;
+        }
+
+        // Update offscreen canvas and redraw
+        offscreenCtx.putImageData(pixels, 0, 0);
+
+        // Redraw on main canvas respecting current zoom/pan
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        if (currentTransform) {
+          ctx.translate(
+            currentTransform.x * scaleX,
+            currentTransform.y * scaleY
+          );
+          ctx.scale(currentTransform.k, currentTransform.k);
+        }
+        ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
+        ctx.restore();
+      }
+
+      function applyStretchFromInputs() {
+        // sliders are percentiles 0..100; convert to data values via histogram
+        const pmin = parseFloat(stretchMin.value);
+        const pmax = parseFloat(stretchMax.value);
+        const vmin = valueForPercentile(pmin);
+        const vmax = valueForPercentile(pmax);
+        const gamma = parseInt(stretchGamma.value, 10) / 100;
+        const useLog = logToggleCheckbox.checked;
+        applyStretch(vmin, vmax, gamma, useLog);
+      }
+
+      // Wire up controls
+      autoZ.addEventListener("click", () => {
+        if (!imageData) return;
+        const z = zscale(imageData);
+        // Set sliders to the percentiles corresponding to zscale values
+        const pmin = percentileForValue(z.vmin);
+        const pmax = percentileForValue(z.vmax);
+        stretchMin.value = pmin;
+        stretchMax.value = pmax;
+        stretchMinValue.textContent = `${pmin.toFixed(2)}% → ${z.vmin.toFixed(
+          2
+        )}`;
+        stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${z.vmax.toFixed(
+          2
+        )}`;
+        stretchGamma.value = 100;
+        stretchGammaValue.textContent = (1.0).toFixed(2);
+        logToggleCheckbox.checked = false;
+        applyStretchFromInputs();
+      });
+
+      stretchMin.addEventListener("input", (e) => {
+        const p = Number(e.target.value);
+        const v = valueForPercentile(p);
+        stretchMinValue.textContent = `${p.toFixed(2)}% → ${v.toFixed(2)}`;
+        applyStretchFromInputs();
+      });
+      stretchMax.addEventListener("input", (e) => {
+        const p = Number(e.target.value);
+        const v = valueForPercentile(p);
+        stretchMaxValue.textContent = `${p.toFixed(2)}% → ${v.toFixed(2)}`;
+        applyStretchFromInputs();
+      });
+
+      stretchGamma.addEventListener("input", (e) => {
+        const g = parseInt(e.target.value, 10) / 100;
+        stretchGammaValue.textContent = g.toFixed(2);
+        applyStretchFromInputs();
+      });
+
+      logToggleCheckbox.addEventListener("change", () => {
+        applyStretchFromInputs();
+      });
 
       function updateColor() {
         const styles = getComputedStyle(document.querySelector("html"));
@@ -865,6 +1184,39 @@
         ctx.imageSmoothingEnabled = false;
 
         console.timeLog("renderMonochromeImage", "Image rendered");
+
+        // Initialize stretch sliders and values based on data
+        try {
+          // build histogram and set percentile sliders (0-100th percentile)
+          histogram = buildHistogram(imageData, 4096);
+          const z = zscale(imageData);
+
+          // slider range is percent
+          stretchMin.min = 0;
+          stretchMin.max = 100;
+          stretchMax.min = 0;
+          stretchMax.max = 100;
+
+          // compute percentiles for zscale vmin/vmax
+          const pmin = percentileForValue(z.vmin);
+          const pmax = percentileForValue(z.vmax);
+          stretchMin.value = pmin;
+          stretchMax.value = pmax;
+          stretchMinValue.textContent = `${pmin.toFixed(2)}% → ${z.vmin.toFixed(
+            2
+          )}`;
+          stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${z.vmax.toFixed(
+            2
+          )}`;
+          stretchGamma.value = 100;
+          stretchGammaValue.textContent = (1.0).toFixed(2);
+          logToggleCheckbox.checked = false;
+
+          // Apply initial stretch (converts percent -> values internally)
+          applyStretchFromInputs();
+        } catch (err) {
+          console.warn("Failed to initialize stretch sliders:", err);
+        }
 
         // rescale the canvas to fit the window
         scaleFactor = Math.min(
