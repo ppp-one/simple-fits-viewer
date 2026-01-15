@@ -10,42 +10,42 @@
     <div style="display: flex; align-items: center; height: 100%">
       <div id="spinner"></div>
     </div>
-      <div class="mainContainer" style="display: none">
-        <div id="controlsContainer" style="display:none">
-          <div id="stretchControls" class="stretch-controls">
-            <div class="stretch-header">
-              <span class="stretch-title">Z-scale</span>
-              <div class="stretch-header-actions">
-                <label class="stretch-log" for="logToggleButton" title="Apply logarithmic stretch">
-                  <input id="logToggleButton" type="checkbox" />
-                  <span>Log</span>
-                </label>
-                <button id="autoZ" type="button">Auto</button>
-              </div>
+    <div class="mainContainer" style="display: none">
+      <div id="controlsContainer" style="display:none">
+        <div id="stretchControls" class="stretch-controls">
+          <div class="stretch-header">
+            <span class="stretch-title">Z-scale</span>
+            <div class="stretch-header-actions">
+              <label class="stretch-log" for="logToggleButton" title="Apply logarithmic stretch">
+                <input id="logToggleButton" type="checkbox" />
+                <span>Log</span>
+              </label>
+              <button id="autoZ" type="button">Auto</button>
             </div>
-            <label class="stretch-field">
-              <div class="stretch-field-header">
-                <span>Min</span>
-                <span id="stretchMinValue">0.00</span>
-              </div>
-              <input id="stretchMin" type="range" step="any" />
-            </label>
-            <label class="stretch-field">
-              <div class="stretch-field-header">
-                <span>Max</span>
-                <span id="stretchMaxValue">0.00</span>
-              </div>
-              <input id="stretchMax" type="range" step="any" />
-            </label>
-            <label class="stretch-field">
-              <div class="stretch-field-header">
-                <span>Gamma</span>
-                <span id="stretchGammaValue">1.00</span>
-              </div>
-              <input id="stretchGamma" type="range" min="10" max="300" value="100" />
-            </label>
           </div>
+          <label class="stretch-field">
+            <div class="stretch-field-header">
+              <span>Min</span>
+              <span id="stretchMinValue">0.00</span>
+            </div>
+            <input id="stretchMin" type="range" step="any" />
+          </label>
+          <label class="stretch-field">
+            <div class="stretch-field-header">
+              <span>Max</span>
+              <span id="stretchMaxValue">0.00</span>
+            </div>
+            <input id="stretchMax" type="range" step="any" />
+          </label>
+          <label class="stretch-field">
+            <div class="stretch-field-header">
+              <span>Gamma</span>
+              <span id="stretchGammaValue">1.00</span>
+            </div>
+            <input id="stretchGamma" type="range" min="10" max="300" value="100" />
+          </label>
         </div>
+      </div>
       <div id="imageGridContainer" class="grid-container">
         <div id="canvasContainer">
           <canvas id="loadedImage"></canvas>
@@ -251,10 +251,10 @@
             existingStretch.classList.remove("menu-active");
             existingStretch.style.display = "none";
             // Prefer restoring to the dedicated controls container if present
-            const fallbackParent = document.getElementById("controlsContainer") || document.querySelector(".mainContainer");
-            if (fallbackParent) {
+            const defaultControlsParent = document.getElementById("controlsContainer") || document.querySelector(".mainContainer");
+            if (defaultControlsParent) {
               // append back into the container (controlsContainer is hidden by default)
-              fallbackParent.appendChild(existingStretch);
+              defaultControlsParent.appendChild(existingStretch);
             }
           }
           document.body.removeChild(activeContextMenu);
@@ -635,7 +635,9 @@
           if (norm > 1) norm = 1;
 
           if (useLog) {
-            norm = Math.log10(1 + norm * range) / logDenom; // log stretch
+            // Clipping aside, the following log stretch is equivalent to
+            // log10(1 + val - vmin) / log10(1 + vmax - vmin)
+            norm = Math.log10(1 + norm * range) / logDenom;
           }
 
           // gamma correction (slider value is 100 -> gamma 1.0)
@@ -1151,7 +1153,7 @@
 
         // Initialize stretch sliders and values based on data
         try {
-            // build histogram and set percentile sliders (percent 0..100)
+            // build histogram and set percentile sliders (0-100th percentile)
             histogram = buildHistogram(imageData, 4096);
             const z = zscale(imageData);
 
@@ -1167,7 +1169,7 @@
             stretchMin.value = pmin;
             stretchMax.value = pmax;
             stretchMinValue.textContent = `${pmin.toFixed(2)}% → ${z.vmin.toFixed(2)}`;
-            stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${Number(z.vmax).toFixed(2)}`;
+            stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${z.vmax.toFixed(2)}`;
             stretchGamma.value = 100;
             stretchGammaValue.textContent = (1.0).toFixed(2);
             logToggleCheckbox.checked = false;
