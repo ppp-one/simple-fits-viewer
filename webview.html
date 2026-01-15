@@ -11,12 +11,16 @@
       <div id="spinner"></div>
     </div>
     <div class="mainContainer" style="display: none">
-      <div id="controlsContainer" style="display:none">
+      <div id="controlsContainer" style="display: none">
         <div id="stretchControls" class="stretch-controls">
           <div class="stretch-header">
             <span class="stretch-title">Z-scale</span>
             <div class="stretch-header-actions">
-              <label class="stretch-log" for="logToggleButton" title="Apply logarithmic stretch">
+              <label
+                class="stretch-log"
+                for="logToggleButton"
+                title="Apply logarithmic stretch"
+              >
                 <input id="logToggleButton" type="checkbox" />
                 <span>Log</span>
               </label>
@@ -42,7 +46,13 @@
               <span>Gamma</span>
               <span id="stretchGammaValue">1.00</span>
             </div>
-            <input id="stretchGamma" type="range" min="10" max="300" value="100" />
+            <input
+              id="stretchGamma"
+              type="range"
+              min="10"
+              max="300"
+              value="100"
+            />
           </label>
         </div>
       </div>
@@ -251,7 +261,9 @@
             existingStretch.classList.remove("menu-active");
             existingStretch.style.display = "none";
             // Prefer restoring to the dedicated controls container if present
-            const defaultControlsParent = document.getElementById("controlsContainer") || document.querySelector(".mainContainer");
+            const defaultControlsParent =
+              document.getElementById("controlsContainer") ||
+              document.querySelector(".mainContainer");
             if (defaultControlsParent) {
               // append back into the container (controlsContainer is hidden by default)
               defaultControlsParent.appendChild(existingStretch);
@@ -375,7 +387,10 @@
           stretchControlsEl.style.display = "none";
           if (originalStretchParent) {
             if (originalStretchNext) {
-              originalStretchParent.insertBefore(stretchControlsEl, originalStretchNext);
+              originalStretchParent.insertBefore(
+                stretchControlsEl,
+                originalStretchNext
+              );
             } else {
               originalStretchParent.appendChild(stretchControlsEl);
             }
@@ -598,7 +613,11 @@
         if (idx >= histogram.nbins) idx = histogram.nbins - 1;
         const countBefore = idx === 0 ? 0 : histogram.cumsum[idx - 1];
         const within = histogram.counts[idx];
-        const frac = within === 0 ? 0 : (v - (histogram.min + idx * histogram.binWidth)) / histogram.binWidth;
+        const frac =
+          within === 0
+            ? 0
+            : (v - (histogram.min + idx * histogram.binWidth)) /
+              histogram.binWidth;
         const rank = countBefore + frac * within;
         return (rank / (histogram.total - 1)) * 100;
       }
@@ -688,8 +707,12 @@
         const pmax = percentileForValue(z.vmax);
         stretchMin.value = pmin;
         stretchMax.value = pmax;
-        stretchMinValue.textContent = `${pmin.toFixed(2)}% → ${z.vmin.toFixed(2)}`;
-        stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${z.vmax.toFixed(2)}`;
+        stretchMinValue.textContent = `${pmin.toFixed(2)}% → ${z.vmin.toFixed(
+          2
+        )}`;
+        stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${z.vmax.toFixed(
+          2
+        )}`;
         stretchGamma.value = 100;
         stretchGammaValue.textContent = (1.0).toFixed(2);
         logToggleCheckbox.checked = false;
@@ -1164,29 +1187,33 @@
 
         // Initialize stretch sliders and values based on data
         try {
-            // build histogram and set percentile sliders (0-100th percentile)
-            histogram = buildHistogram(imageData, 4096);
-            const z = zscale(imageData);
+          // build histogram and set percentile sliders (0-100th percentile)
+          histogram = buildHistogram(imageData, 4096);
+          const z = zscale(imageData);
 
-            // slider range is percent
-            stretchMin.min = 0;
-            stretchMin.max = 100;
-            stretchMax.min = 0;
-            stretchMax.max = 100;
+          // slider range is percent
+          stretchMin.min = 0;
+          stretchMin.max = 100;
+          stretchMax.min = 0;
+          stretchMax.max = 100;
 
-            // compute percentiles for zscale vmin/vmax
-            const pmin = percentileForValue(z.vmin);
-            const pmax = percentileForValue(z.vmax);
-            stretchMin.value = pmin;
-            stretchMax.value = pmax;
-            stretchMinValue.textContent = `${pmin.toFixed(2)}% → ${z.vmin.toFixed(2)}`;
-            stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${z.vmax.toFixed(2)}`;
-            stretchGamma.value = 100;
-            stretchGammaValue.textContent = (1.0).toFixed(2);
-            logToggleCheckbox.checked = false;
+          // compute percentiles for zscale vmin/vmax
+          const pmin = percentileForValue(z.vmin);
+          const pmax = percentileForValue(z.vmax);
+          stretchMin.value = pmin;
+          stretchMax.value = pmax;
+          stretchMinValue.textContent = `${pmin.toFixed(2)}% → ${z.vmin.toFixed(
+            2
+          )}`;
+          stretchMaxValue.textContent = `${pmax.toFixed(2)}% → ${z.vmax.toFixed(
+            2
+          )}`;
+          stretchGamma.value = 100;
+          stretchGammaValue.textContent = (1.0).toFixed(2);
+          logToggleCheckbox.checked = false;
 
-            // Apply initial stretch (converts percent -> values internally)
-            applyStretchFromInputs();
+          // Apply initial stretch (converts percent -> values internally)
+          applyStretchFromInputs();
         } catch (err) {
           console.warn("Failed to initialize stretch sliders:", err);
         }
