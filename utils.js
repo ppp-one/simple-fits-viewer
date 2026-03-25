@@ -32,36 +32,84 @@ function parseFITSImage(arrayBuffer, dataView) {
     const bscale = parseFloat(header["BSCALE"]) || 1;
     const bzero = parseFloat(header["BZERO"]) || 0;
 
-    // Parse Image Data
+    // Parse Image Data — using byte-swap + typed array for speed
     const dataSize = width * height;
     const bytesPerPixel = Math.abs(bitpix) / 8;
+    const totalBytes = dataSize * bytesPerPixel;
+    const src = new Uint8Array(arrayBuffer, offset, totalBytes);
 
-    // Use a typed array for image data
     let data;
-    if (bitpix === 8 || bitpix === 16 || bitpix === 32) {
+    if (bitpix === 8) {
+        // 8-bit: no byte-swap needed
         data = new Int32Array(dataSize);
+        for (let i = 0; i < dataSize; i++) {
+            data[i] = src[i] * bscale + bzero;
+        }
+    } else if (bitpix === 16) {
+        // 16-bit big-endian → swap bytes, read as Int16, store as Int32
+        const buf = new ArrayBuffer(totalBytes);
+        const dst = new Uint8Array(buf);
+        for (let i = 0; i < totalBytes; i += 2) {
+            dst[i]     = src[i + 1];
+            dst[i + 1] = src[i];
+        }
+        const raw = new Int16Array(buf);
+        data = new Int32Array(dataSize);
+        if (bscale === 1 && bzero === 0) {
+            for (let i = 0; i < dataSize; i++) data[i] = raw[i];
+        } else {
+            for (let i = 0; i < dataSize; i++) data[i] = raw[i] * bscale + bzero;
+        }
+    } else if (bitpix === 32) {
+        // 32-bit int big-endian → swap 4 bytes
+        const buf = new ArrayBuffer(totalBytes);
+        const dst = new Uint8Array(buf);
+        for (let i = 0; i < totalBytes; i += 4) {
+            dst[i]     = src[i + 3];
+            dst[i + 1] = src[i + 2];
+            dst[i + 2] = src[i + 1];
+            dst[i + 3] = src[i];
+        }
+        data = new Int32Array(buf);
+        if (bscale !== 1 || bzero !== 0) {
+            for (let i = 0; i < dataSize; i++) data[i] = data[i] * bscale + bzero;
+        }
     } else if (bitpix === -32) {
-        data = new Float32Array(dataSize);
+        // 32-bit float big-endian → swap 4 bytes
+        const buf = new ArrayBuffer(totalBytes);
+        const dst = new Uint8Array(buf);
+        for (let i = 0; i < totalBytes; i += 4) {
+            dst[i]     = src[i + 3];
+            dst[i + 1] = src[i + 2];
+            dst[i + 2] = src[i + 1];
+            dst[i + 3] = src[i];
+        }
+        data = new Float32Array(buf);
+        if (bscale !== 1 || bzero !== 0) {
+            for (let i = 0; i < dataSize; i++) data[i] = data[i] * bscale + bzero;
+        }
     } else if (bitpix === -64) {
-        data = new Float64Array(dataSize);
+        // 64-bit float big-endian → swap 8 bytes
+        const buf = new ArrayBuffer(totalBytes);
+        const dst = new Uint8Array(buf);
+        for (let i = 0; i < totalBytes; i += 8) {
+            dst[i]     = src[i + 7];
+            dst[i + 1] = src[i + 6];
+            dst[i + 2] = src[i + 5];
+            dst[i + 3] = src[i + 4];
+            dst[i + 4] = src[i + 3];
+            dst[i + 5] = src[i + 2];
+            dst[i + 6] = src[i + 1];
+            dst[i + 7] = src[i];
+        }
+        data = new Float64Array(buf);
+        if (bscale !== 1 || bzero !== 0) {
+            for (let i = 0; i < dataSize; i++) data[i] = data[i] * bscale + bzero;
+        }
     } else {
         throw new Error(`Unsupported BITPIX: ${bitpix}`);
     }
-
-    for (let i = 0; i < dataSize; i++) {
-        if (bitpix === 8) {
-            data[i] = dataView.getUint8(offset) * bscale + bzero;
-        } else if (bitpix === 16) {
-            data[i] = dataView.getInt16(offset, false) * bscale + bzero;
-        } else if (bitpix === 32) {
-            data[i] = dataView.getInt32(offset, false) * bscale + bzero;
-        } else if (bitpix === -32) {
-            data[i] = dataView.getFloat32(offset, false) * bscale + bzero;
-        } else if (bitpix === -64) {
-            data[i] = dataView.getFloat64(offset, false) * bscale + bzero;
-        }
-        offset += bytesPerPixel;
-    }
+    offset += totalBytes;
     console.timeLog("parseFITSImage", "parseFITSImageData");
 
     // Normalize Data for Display

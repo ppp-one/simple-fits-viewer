@@ -143,11 +143,15 @@
       const yProfileCtx = yProfileCanvas.getContext("2d");
 
       let offscreenCanvas, offscreenCtx;
+      let useWebGL = false;
+      let webglAvailable = false;
+      let gl = null;
+      let glProgram = null;
+      let glUniforms = {};
       let imageWidth, imageHeight;
       let histogram = null;
       let currentTransform = d3.zoomIdentity;
       let imageData = null;
-      let imageDataT = null;
       let normalizedData = null;
       let scaleFactor = 1;
       let rect = null;
@@ -362,6 +366,35 @@
         });
 
         contextMenu.appendChild(saveOption);
+
+        // GPU toggle option
+        const gpuOption = document.createElement("div");
+        gpuOption.style.cursor = webglAvailable ? "pointer" : "default";
+        gpuOption.style.padding = "3px";
+        gpuOption.style.opacity = webglAvailable ? "1" : "0.4";
+        if (webglAvailable) {
+          gpuOption.textContent = useWebGL ? "GPU: ON" : "GPU: OFF";
+          addHoverEffect(gpuOption);
+          gpuOption.addEventListener("click", () => {
+            if (useWebGL) {
+              // Switch to CPU
+              useWebGL = false;
+              offscreenCanvas = document.createElement("canvas");
+              offscreenCanvas.width = imageWidth;
+              offscreenCanvas.height = imageHeight;
+              offscreenCtx = offscreenCanvas.getContext("2d");
+              gpuOption.textContent = "GPU: OFF";
+            } else {
+              // Switch to GPU
+              useWebGL = initWebGL(imageWidth, imageHeight, imageData);
+              gpuOption.textContent = useWebGL ? "GPU: ON" : "GPU: OFF";
+            }
+            applyStretchFromInputs();
+          });
+        } else {
+          gpuOption.textContent = "GPU: unavailable";
+        }
+        contextMenu.appendChild(gpuOption);
 
         // Move the stretch controls into the context menu while it's open
         const stretchControlsEl = document.getElementById("stretchControls");
@@ -634,44 +667,39 @@
 
       // Helper to apply stretch to the displayed canvas using the original image data
       function applyStretch(vmin, vmax, gamma = 1.0, useLog = false) {
-        if (!imageData || !offscreenCtx) return;
+        if (!imageData) return;
 
-        const width = imageWidth;
-        const height = imageHeight;
-        const pixels = offscreenCtx.createImageData(width, height);
-        const out = pixels.data;
-        const range = vmax - vmin || 1;
+        if (useWebGL && gl) {
+          // GPU path: update uniforms and redraw
+          glRenderStretch(vmin, vmax, gamma <= 0 ? 1 : gamma, useLog);
+        } else {
+          // CPU fallback
+          if (!offscreenCtx) return;
+          const width = imageWidth;
+          const height = imageHeight;
+          const pixels = offscreenCtx.createImageData(width, height);
+          const out = pixels.data;
+          const range = vmax - vmin || 1;
+          const logDenom = useLog ? Math.log10(1 + range) : 1;
 
-        // Precompute log denom if needed
-        const logDenom = useLog ? Math.log10(1 + range) : 1;
-
-        for (let i = 0, j = 0; i < imageData.length; i++, j += 4) {
-          const val = imageData[i];
-
-          // Linear scale to 0..1
-          let norm = (val - vmin) / range;
-          if (norm < 0) norm = 0;
-          if (norm > 1) norm = 1;
-
-          if (useLog) {
-            // Clipping aside, the following log stretch is equivalent to
-            // log10(1 + val - vmin) / log10(1 + vmax - vmin)
-            norm = Math.log10(1 + norm * range) / logDenom;
+          for (let i = 0, j = 0; i < imageData.length; i++, j += 4) {
+            const val = imageData[i];
+            let norm = (val - vmin) / range;
+            if (norm < 0) norm = 0;
+            if (norm > 1) norm = 1;
+            if (useLog) {
+              norm = Math.log10(1 + norm * range) / logDenom;
+            }
+            const g = gamma <= 0 ? 1 : gamma;
+            norm = Math.pow(norm, 1 / g);
+            const c = Math.round(norm * 255);
+            out[j] = c;
+            out[j + 1] = c;
+            out[j + 2] = c;
+            out[j + 3] = 255;
           }
-
-          // gamma correction (slider value is 100 -> gamma 1.0)
-          const g = gamma <= 0 ? 1 : gamma;
-          norm = Math.pow(norm, 1 / g);
-
-          const c = Math.round(norm * 255);
-          out[j] = c;
-          out[j + 1] = c;
-          out[j + 2] = c;
-          out[j + 3] = 255;
+          offscreenCtx.putImageData(pixels, 0, 0);
         }
-
-        // Update offscreen canvas and redraw
-        offscreenCtx.putImageData(pixels, 0, 0);
 
         // Redraw on main canvas respecting current zoom/pan
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -753,6 +781,117 @@
         profileColor = editorCompositionBorder;
         gridColor = editorForeGround;
       }
+
+      // ── WebGL infrastructure ──────────────────────────────────────
+      const VERT_SRC = `
+        attribute vec2 a_pos;
+        varying vec2 v_uv;
+        void main() {
+          v_uv = a_pos * 0.5 + 0.5;
+          v_uv.y = 1.0 - v_uv.y; // flip Y for image coords
+          gl_Position = vec4(a_pos, 0.0, 1.0);
+        }`;
+
+      const FRAG_SRC = `
+        precision highp float;
+        varying vec2 v_uv;
+        uniform sampler2D u_image;
+        uniform float u_vmin;
+        uniform float u_vmax;
+        uniform float u_gamma;
+        uniform float u_useLog;   // 1.0 = on, 0.0 = off
+        void main() {
+          float val = texture2D(u_image, v_uv).r;
+          float range = u_vmax - u_vmin;
+          if (range == 0.0) range = 1.0;
+          float norm = clamp((val - u_vmin) / range, 0.0, 1.0);
+          // optional log stretch
+          if (u_useLog > 0.5) {
+            norm = log(1.0 + norm * range) / log(1.0 + range);
+          }
+          // gamma correction
+          norm = pow(norm, 1.0 / u_gamma);
+          gl_FragColor = vec4(norm, norm, norm, 1.0);
+        }`;
+
+      function initWebGL(width, height, floatData) {
+        offscreenCanvas = document.createElement("canvas");
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+
+        gl = offscreenCanvas.getContext("webgl", { preserveDrawingBuffer: true });
+        if (!gl) return false;
+
+        const ext = gl.getExtension("OES_texture_float");
+        if (!ext) { gl = null; return false; }
+
+        // Compile shaders
+        function compile(type, src) {
+          const s = gl.createShader(type);
+          gl.shaderSource(s, src);
+          gl.compileShader(s);
+          if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(s));
+            return null;
+          }
+          return s;
+        }
+        const vs = compile(gl.VERTEX_SHADER, VERT_SRC);
+        const fs = compile(gl.FRAGMENT_SHADER, FRAG_SRC);
+        if (!vs || !fs) { gl = null; return false; }
+
+        glProgram = gl.createProgram();
+        gl.attachShader(glProgram, vs);
+        gl.attachShader(glProgram, fs);
+        gl.linkProgram(glProgram);
+        if (!gl.getProgramParameter(glProgram, gl.LINK_STATUS)) {
+          console.error(gl.getProgramInfoLog(glProgram));
+          gl = null;
+          return false;
+        }
+        gl.useProgram(glProgram);
+
+        // Full-screen quad
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+          -1, -1,  1, -1,  -1, 1,
+          -1,  1,  1, -1,   1, 1
+        ]), gl.STATIC_DRAW);
+        const aPos = gl.getAttribLocation(glProgram, "a_pos");
+        gl.enableVertexAttribArray(aPos);
+        gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+        // Upload float texture
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, width, height, 0,
+                      gl.LUMINANCE, gl.FLOAT, new Float32Array(floatData));
+
+        // Cache uniform locations
+        glUniforms = {
+          vmin: gl.getUniformLocation(glProgram, "u_vmin"),
+          vmax: gl.getUniformLocation(glProgram, "u_vmax"),
+          gamma: gl.getUniformLocation(glProgram, "u_gamma"),
+          useLog: gl.getUniformLocation(glProgram, "u_useLog"),
+        };
+
+        gl.viewport(0, 0, width, height);
+        return true;
+      }
+
+      function glRenderStretch(vmin, vmax, gamma, useLog) {
+        gl.uniform1f(glUniforms.vmin, vmin);
+        gl.uniform1f(glUniforms.vmax, vmax);
+        gl.uniform1f(glUniforms.gamma, gamma);
+        gl.uniform1f(glUniforms.useLog, useLog ? 1.0 : 0.0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+      // ── End WebGL infrastructure ──────────────────────────────────
 
       function displayHeaderTable(data) {
         headerTable.innerHTML = "";
@@ -1146,41 +1285,36 @@
 
         console.timeLog("renderMonochromeImage", "Plate scale calculated");
 
-        // Step 4: Precompute the transposed data for vertical profiles
-        imageDataT = new Array(imageWidth);
-        for (let x = 0; x < imageWidth; x++) {
-          imageDataT[x] = new Array(imageHeight);
-          for (let y = 0; y < imageHeight; y++) {
-            imageDataT[x][y] = imageData[y * imageWidth + x];
-          }
-        }
+        console.timeLog("renderMonochromeImage", "Skipped transposition (on-demand)");
 
-        console.timeLog("renderMonochromeImage", "Data transposed");
-
-        // Step 5: Compute the ImageData object for rendering
-        const canvasData = new ImageData(imageWidth, imageHeight);
-        const data = canvasData.data;
-        for (let i = 0; i < normalizedData.length; i++) {
-          const pixelValue = normalizedData[i];
-          const index = i * 4;
-          data[index] = data[index + 1] = data[index + 2] = pixelValue;
-          data[index + 3] = 255;
-        }
-        console.timeLog("renderMonochromeImage", "ImageData object created");
-
-        // Step 6: Render the image on the canvas
+        // Step 5 & 6: Set up offscreen canvas and render
         canvas.width = imageWidth;
         canvas.height = imageHeight;
 
-        offscreenCanvas = document.createElement("canvas");
-        offscreenCanvas.width = imageWidth;
-        offscreenCanvas.height = imageHeight;
-        offscreenCtx = offscreenCanvas.getContext("2d");
-        offscreenCtx.putImageData(canvasData, 0, 0);
+        // Try WebGL for GPU-accelerated stretch
+        useWebGL = initWebGL(imageWidth, imageHeight, imageData);
+        webglAvailable = useWebGL;
+        if (useWebGL) {
+          console.log("WebGL acceleration enabled");
+        } else {
+          // CPU fallback: create 2D offscreen canvas with normalized data
+          console.log("WebGL unavailable, using CPU rendering");
+          offscreenCanvas = document.createElement("canvas");
+          offscreenCanvas.width = imageWidth;
+          offscreenCanvas.height = imageHeight;
+          offscreenCtx = offscreenCanvas.getContext("2d");
+          const canvasData = new ImageData(imageWidth, imageHeight);
+          const data = canvasData.data;
+          for (let i = 0; i < normalizedData.length; i++) {
+            const pixelValue = normalizedData[i];
+            const index = i * 4;
+            data[index] = data[index + 1] = data[index + 2] = pixelValue;
+            data[index + 3] = 255;
+          }
+          offscreenCtx.putImageData(canvasData, 0, 0);
+          ctx.drawImage(offscreenCanvas, 0, 0);
+        }
 
-        ctx.drawImage(offscreenCanvas, 0, 0);
-        ctx.webkitImageSmoothingEnabled = false;
-        ctx.mozImageSmoothingEnabled = false;
         ctx.imageSmoothingEnabled = false;
 
         console.timeLog("renderMonochromeImage", "Image rendered");
@@ -1292,10 +1426,12 @@
             transformedY * width + left,
             transformedY * width + left + xWidth + 1
           );
-          const yProfile = imageDataT[transformedX].slice(
-            top,
-            top + yHeight + 1
-          );
+          // Extract vertical column on demand (avoids O(W*H) transposition)
+          const yLen = Math.min(yHeight + 1, imageHeight - top);
+          const yProfile = new Float32Array(yLen);
+          for (let i = 0; i < yLen; i++) {
+            yProfile[i] = imageData[(top + i) * width + transformedX];
+          }
 
           // Draw line profiles
           drawLineProfile(
