@@ -1479,7 +1479,15 @@
           ctx.scale(currentTransform.k, currentTransform.k);
           ctx.drawImage(offscreenCanvas, 0, 0, imageWidth, imageHeight);
 
-          if ((peak / background > 1.2) & (fwhmResult.fwhm > 0)) {
+          // Use signal-to-noise ratio for star detection instead of a fixed
+          // peak/background ratio. SNR adapts to the noise level of each image,
+          // allowing faint stars to be detected in clean backgrounds.
+          const snr = fwhmResult.backgroundSigma > 0
+            ? (peak - background) / fwhmResult.backgroundSigma
+            : (background > 0 ? (peak / background - 1) * 100 : 0);
+          // Reject hot pixels: real stars have sharpness > ~0.3 (PSF spreads
+          // light to neighbors), while hot pixels drop to ~0 at bin 1.
+          if (snr > 5 && fwhmResult.fwhm > 0 && fwhmResult.sharpness > 0.2) {
             drawApertureCircles(fwhmResult, scaleX / currentTransform.k);
 
             // Display FWHM information

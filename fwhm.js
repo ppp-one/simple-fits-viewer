@@ -4,7 +4,7 @@ function calculateStarFWHM(image, centerX, centerY) {
     if (!image || image.length === 0 || !image[0] || image[0].length === 0) {
         return {
             center: { x: centerX || 0, y: centerY || 0 },
-            peak: 0, background: 0, fwhm: 0, hwhm: 0,
+            peak: 0, background: 0, backgroundSigma: 0, sharpness: 0, fwhm: 0, hwhm: 0,
             radii: { r1: 0, r2: 0, r3: 0 },
             radialProfile: { radius: [], intensity: [], normalizedIntensity: [] }
         };
@@ -65,6 +65,32 @@ function calculateStarFWHM(image, centerX, centerY) {
 
     background = background / backgroundCount;
 
+    // Calculate background standard deviation for noise estimation
+    let backgroundVariance = 0;
+    // Top and bottom borders
+    for (let y = 0; y < borderSize; y++) {
+        for (let x = 0; x < width; x++) {
+            const diff = image[y][x] - background;
+            backgroundVariance += diff * diff;
+        }
+        for (let x = 0; x < width; x++) {
+            const diff = image[height - 1 - y][x] - background;
+            backgroundVariance += diff * diff;
+        }
+    }
+    // Left and right borders (excluding corners counted above)
+    for (let y = borderSize; y < height - borderSize; y++) {
+        for (let x = 0; x < borderSize; x++) {
+            const diff = image[y][x] - background;
+            backgroundVariance += diff * diff;
+        }
+        for (let x = 0; x < borderSize; x++) {
+            const diff = image[y][width - 1 - x] - background;
+            backgroundVariance += diff * diff;
+        }
+    }
+    const backgroundSigma = Math.sqrt(backgroundVariance / backgroundCount);
+
     // Determine the radius to analyze (distance to edge from center)
     const maxRadius = Math.min(
         Math.min(centerX, width - 1 - centerX),
@@ -123,20 +149,42 @@ function calculateStarFWHM(image, centerX, centerY) {
         isNaN(value) ? NaN : (value - background) / (meanPeak - background)
     );
 
-    // Find FWHM by locating where the normalized intensity crosses 0.5
+    // Smooth the normalized radial profile to reduce noise effects
+    // Uses a 3-bin moving average, preserving the first and last valid bins
+    const smoothedNorm = new Array(nBins);
+    for (let bin = 0; bin < nBins; bin++) {
+        if (bin === 0 || bin === nBins - 1) {
+            smoothedNorm[bin] = normalizedMeans[bin];
+        } else {
+            const vals = [normalizedMeans[bin - 1], normalizedMeans[bin], normalizedMeans[bin + 1]]
+                .filter(v => !isNaN(v));
+            smoothedNorm[bin] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : NaN;
+        }
+    }
+
+    // Find FWHM by locating where the smoothed normalized intensity crosses 0.5
     let fwhm = 0;
     let foundFWHM = false;
 
     for (let bin = 1; bin < nBins; bin++) {
         if (!foundFWHM &&
-            !isNaN(normalizedMeans[bin - 1]) && !isNaN(normalizedMeans[bin]) &&
-            normalizedMeans[bin - 1] > 0.5 && normalizedMeans[bin] <= 0.5) {
+            !isNaN(smoothedNorm[bin - 1]) && !isNaN(smoothedNorm[bin]) &&
+            smoothedNorm[bin - 1] > 0.5 && smoothedNorm[bin] <= 0.5) {
 
             // Linear interpolation to find the exact radius where intensity = 0.5
-            const m = (normalizedMeans[bin] - normalizedMeans[bin - 1]) / (radii[bin] - radii[bin - 1]);
-            fwhm = 2.0 * (radii[bin - 1] + (0.5 - normalizedMeans[bin - 1]) / m);
+            const m = (smoothedNorm[bin] - smoothedNorm[bin - 1]) / (radii[bin] - radii[bin - 1]);
+            fwhm = 2.0 * (radii[bin - 1] + (0.5 - smoothedNorm[bin - 1]) / m);
             foundFWHM = true;
         }
+    }
+
+    // Sharpness: fraction of peak signal retained in the first neighbor ring.
+    // A real star's PSF spreads light so bin 1 stays well above background
+    // (sharpness ~0.4-0.9). A hot pixel drops immediately (sharpness ~0).
+    let sharpness = 0;
+    if (nBins >= 2 && !isNaN(normalizedMeans[0]) && !isNaN(normalizedMeans[1])
+        && normalizedMeans[0] > 0) {
+        sharpness = normalizedMeans[1] / normalizedMeans[0];
     }
 
     // Calculate the appropriate aperture radii based on FWHM
@@ -149,6 +197,8 @@ function calculateStarFWHM(image, centerX, centerY) {
         center: { x: centerX, y: centerY },
         peak: peak,
         background: background,
+        backgroundSigma: backgroundSigma,
+        sharpness: sharpness,
         fwhm: fwhm,
         hwhm: fwhm / 2,  // Half Width at Half Maximum
         radii: { r1, r2, r3 }, // Aperture radii
@@ -249,16 +299,16 @@ function drawApertureCircles(fwhmResult, scale) {
 
     // Draw the three aperture circles
     const { center, radii } = fwhmResult;
-    ctx.lineWidth = scale;    // Keep line width constant
+    ctx.lineWidth = scale*2;    // Keep line width constant
 
     // FWHM circle
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';  // Green with transparency
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';  // Black with transparency
     ctx.beginPath();
     ctx.arc(center.x, center.y, fwhmResult.fwhm / 2, 0, Math.PI * 2);
     ctx.stroke();
 
     // Outer aperture (background)
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';  // Red with transparency
+    ctx.strokeStyle = 'rgba(26, 255, 0, 0.8)';  // Green with transparency
     ctx.beginPath();
     ctx.arc(center.x, center.y, radii.r3, 0, Math.PI * 2);
     ctx.stroke();
