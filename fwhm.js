@@ -1,5 +1,15 @@
 // Function to calculate the Full Width at Half Maximum (FWHM) of a star in an image
 function calculateStarFWHM(image, centerX, centerY) {
+    // Guard against empty or undefined image
+    if (!image || image.length === 0 || !image[0] || image[0].length === 0) {
+        return {
+            center: { x: centerX || 0, y: centerY || 0 },
+            peak: 0, background: 0, fwhm: 0, hwhm: 0,
+            radii: { r1: 0, r2: 0, r3: 0 },
+            radialProfile: { radius: [], intensity: [], normalizedIntensity: [] }
+        };
+    }
+
     // Find the dimensions of the image
     const height = image.length;
     const width = image[0].length;
@@ -24,7 +34,10 @@ function calculateStarFWHM(image, centerX, centerY) {
     let background = 0;
     let backgroundCount = 0;
 
-    const borderSize = Math.max(5, Math.floor(Math.min(width, height) * 0.1));
+    const borderSize = Math.min(
+        Math.max(5, Math.floor(Math.min(width, height) * 0.1)),
+        Math.floor(Math.min(width, height) / 2)
+    );
 
     // Top and bottom borders
     for (let y = 0; y < borderSize; y++) {
