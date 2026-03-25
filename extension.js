@@ -30,7 +30,8 @@ class FITSFileEditor {
         webviewPanel.webview.options = {
             enableScripts: true,
             localResourceRoots: [
-                vscode.Uri.file(path.dirname(document.uri.fsPath))
+                vscode.Uri.file(path.dirname(document.uri.fsPath)),
+                vscode.Uri.file(__dirname)
             ]
         };
 
@@ -38,7 +39,7 @@ class FITSFileEditor {
         const updateWebview = () => {
             try {
                 // Step 1: Update the webview content
-                webviewPanel.webview.html = this.getWebviewContent();
+                webviewPanel.webview.html = this.getWebviewContent(webviewPanel.webview);
 
                 // Step 2: Send data to webview (SLOW?)
                 webviewPanel.webview.onDidReceiveMessage(
@@ -88,11 +89,14 @@ class FITSFileEditor {
         });
     }
 
-    getWebviewContent() {
+    getWebviewContent(webview) {
         const filePath = path.join(__dirname, 'webview.html');
         let content = fs.readFileSync(filePath, 'utf8');
 
-        // Attach utils.js
+        // Attach d3 as a file URI to avoid </script> tag injection issues
+        const d3Uri = webview.asWebviewUri(vscode.Uri.file(path.join(__dirname, 'd3.v7.min.js')));
+        content = content.replace('</head>', `<script src="${d3Uri}"></script></head>`);
+
         const utilsPath = path.join(__dirname, 'utils.js');
         const utilsContent = fs.readFileSync(utilsPath, 'utf8');
 
