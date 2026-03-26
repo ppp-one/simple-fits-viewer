@@ -286,6 +286,8 @@
         contextMenu.style.boxShadow = "0px 2px 5px rgba(0, 0, 0, 0.2)";
         contextMenu.style.borderRadius = "5px";
         contextMenu.style.zIndex = "1000";
+        contextMenu.style.maxHeight = "90vh";
+        contextMenu.style.overflowY = "auto";
 
         // Helper to add hover effect to menu options
         function addHoverEffect(optionDiv) {
@@ -399,8 +401,8 @@
         const stretchControlsEl = document.getElementById("stretchControls");
         const originalStretchParent = stretchControlsEl.parentNode;
         const originalStretchNext = stretchControlsEl.nextSibling;
-        // ensure the menu is wide enough for sliders
-        contextMenu.style.minWidth = "260px";
+        // ensure the menu is wide enough for sliders and histogram
+        contextMenu.style.minWidth = "320px";
 
         // compute image coords for SIMBAD option
         const coords = eventToImageCoords(event.clientX, event.clientY);
@@ -463,6 +465,369 @@
         if (!contextMenu.contains(stretchControlsEl)) {
           contextMenu.appendChild(sep);
           contextMenu.appendChild(stretchControlsEl);
+        }
+
+        // ── Histogram section ──
+        if (histogram && imageData) {
+          const histSep = document.createElement("div");
+          histSep.style.height = "1px";
+          histSep.style.background = "#e6e6e6";
+          histSep.style.margin = "6px 0";
+          contextMenu.appendChild(histSep);
+
+          // Determine x-axis range from BITPIX
+          const bitpixRaw = headerData["BITPIX"]
+            ? parseInt(headerData["BITPIX"].split("/")[0])
+            : null;
+          let histXMin = 0;
+          let histXMax = histogram.max;
+          if (bitpixRaw && bitpixRaw > 0) {
+            // Integer data: range is 0 to 2^bits - 1
+            histXMin = 0;
+            histXMax = Math.pow(2, bitpixRaw) - 1;
+          } else {
+            // Float data: use actual data range
+            histXMin = histogram.min;
+            histXMax = histogram.max;
+          }
+
+          const histW = 300, histH = 150;
+          const padL = 50, padR = 10, padT = 5, padB = 25;
+          const plotW = histW - padL - padR;
+          const plotH = histH - padT - padB;
+
+          // Header row with title and log toggle
+          const histHeader = document.createElement("div");
+          histHeader.style.display = "flex";
+          histHeader.style.justifyContent = "space-between";
+          histHeader.style.alignItems = "center";
+          histHeader.style.fontSize = "12px";
+          histHeader.style.fontWeight = "600";
+          histHeader.style.marginBottom = "4px";
+
+          const histTitle = document.createElement("span");
+          histTitle.textContent = "Histogram";
+          histHeader.appendChild(histTitle);
+
+          const histLogLabel = document.createElement("label");
+          histLogLabel.style.display = "flex";
+          histLogLabel.style.alignItems = "center";
+          histLogLabel.style.gap = "4px";
+          histLogLabel.style.fontSize = "12px";
+          histLogLabel.style.cursor = "pointer";
+          histLogLabel.style.fontWeight = "normal";
+          const histLogCheckbox = document.createElement("input");
+          histLogCheckbox.type = "checkbox";
+          histLogCheckbox.checked = true;
+          histLogLabel.appendChild(histLogCheckbox);
+          histLogLabel.appendChild(document.createTextNode("Log"));
+          histHeader.appendChild(histLogLabel);
+
+          contextMenu.appendChild(histHeader);
+
+          const histCanvas = document.createElement("canvas");
+          const dpr = window.devicePixelRatio || 1;
+          histCanvas.width = histW * dpr;
+          histCanvas.height = histH * dpr;
+          histCanvas.style.width = histW + "px";
+          histCanvas.style.height = histH + "px";
+          histCanvas.style.display = "block";
+          histCanvas.style.cursor = "crosshair";
+          contextMenu.appendChild(histCanvas);
+
+          // Info line for selection percentage
+          const histInfo = document.createElement("div");
+          histInfo.style.fontSize = "11px";
+          histInfo.style.color = "#555";
+          histInfo.style.minHeight = "16px";
+          histInfo.style.marginTop = "2px";
+          contextMenu.appendChild(histInfo);
+
+          const histCtx = histCanvas.getContext("2d");
+          histCtx.scale(dpr, dpr);
+
+          // Compute "nice" tick values for an axis range
+          function niceNum(range, round) {
+            const exp = Math.floor(Math.log10(range));
+            const frac = range / Math.pow(10, exp);
+            let nice;
+            if (round) {
+              if (frac < 1.5) nice = 1;
+              else if (frac < 3) nice = 2;
+              else if (frac < 7) nice = 5;
+              else nice = 10;
+            } else {
+              if (frac <= 1) nice = 1;
+              else if (frac <= 2) nice = 2;
+              else if (frac <= 5) nice = 5;
+              else nice = 10;
+            }
+            return nice * Math.pow(10, exp);
+          }
+
+          function niceTicks(lo, hi, maxTicks) {
+            if (hi === lo) return [lo];
+            const range = niceNum(hi - lo, false);
+            const step = niceNum(range / (maxTicks - 1), true);
+            const start = Math.ceil(lo / step) * step;
+            const ticks = [];
+            for (let v = start; v <= hi + step * 0.01; v += step) {
+              ticks.push(parseFloat(v.toPrecision(12)));
+            }
+            return ticks;
+          }
+
+          function formatTickLabel(val) {
+            if (val === 0) return "0";
+            if (Math.abs(val) >= 1e6 || (Math.abs(val) < 0.01 && val !== 0)) {
+              return val.toExponential(1);
+            }
+            if (Number.isInteger(val)) return val.toLocaleString();
+            return val.toPrecision(3);
+          }
+
+          // Build display bins with a fixed pixel-value width of 10
+          // for integer images, or fall back to plot-width bins for floats
+          const isIntegerBitpix = bitpixRaw && bitpixRaw > 0;
+          const valueBinWidth = isIntegerBitpix ? 10 : (histXMax - histXMin) / plotW;
+          const numValueBins = Math.ceil((histXMax - histXMin) / valueBinWidth) || 1;
+          const binnedCounts = new Float64Array(numValueBins);
+          for (let i = 0; i < histogram.nbins; i++) {
+            const binCenter =
+              histogram.min + (i + 0.5) * histogram.binWidth;
+            let di = Math.floor((binCenter - histXMin) / valueBinWidth);
+            if (di < 0) di = 0;
+            if (di >= numValueBins) di = numValueBins - 1;
+            binnedCounts[di] += histogram.counts[i];
+          }
+
+          // Selection state
+          let selStart = null, selEnd = null, isDragging = false;
+
+          // Snap a CSS coordinate to the nearest device pixel for crisp lines
+          function snap(v) {
+            return Math.round(v * dpr) / dpr + 0.5 / dpr;
+          }
+
+          // Map a value-bin index to plot pixel x range
+          const histRange = histXMax - histXMin;
+          function binToPlotX(binIdx) {
+            const x0 = ((binIdx * valueBinWidth) / histRange) * plotW;
+            const x1 = (((binIdx + 1) * valueBinWidth) / histRange) * plotW;
+            return [x0, x1];
+          }
+          // Map a plot pixel x to a value-bin index
+          function plotXToBin(px) {
+            const val = histXMin + (px / plotW) * histRange;
+            let idx = Math.floor((val - histXMin) / valueBinWidth);
+            if (idx < 0) idx = 0;
+            if (idx >= numValueBins) idx = numValueBins - 1;
+            return idx;
+          }
+
+          function drawHistogram() {
+            const useLog = histLogCheckbox.checked;
+            histCtx.clearRect(0, 0, histW, histH);
+
+            // Compute max count for scaling
+            let maxCount = 0;
+            for (let i = 0; i < numValueBins; i++) {
+              const v = useLog
+                ? Math.log10(binnedCounts[i] + 1)
+                : binnedCounts[i];
+              if (v > maxCount) maxCount = v;
+            }
+            if (maxCount === 0) maxCount = 1;
+
+            // Draw selection highlight
+            if (selStart !== null && selEnd !== null) {
+              const x0 = Math.min(selStart, selEnd);
+              const x1 = Math.max(selStart, selEnd);
+              histCtx.fillStyle = "rgba(66, 133, 244, 0.15)";
+              histCtx.fillRect(padL + x0, padT, x1 - x0, plotH);
+            }
+
+            // Draw bars — map each value bin to its pixel range
+            histCtx.fillStyle = "#555";
+            for (let i = 0; i < numValueBins; i++) {
+              const raw = binnedCounts[i];
+              if (raw === 0) continue;
+              const v = useLog ? Math.log10(raw + 1) : raw;
+              const barH = (v / maxCount) * plotH;
+              const [bx0, bx1] = binToPlotX(i);
+              const drawX = padL + bx0;
+              const drawW = Math.max(1, bx1 - bx0);
+              histCtx.fillRect(drawX, padT + plotH - barH, drawW, barH);
+            }
+
+            // Draw selection overlay bars on top
+            if (selStart !== null && selEnd !== null) {
+              const x0 = Math.min(selStart, selEnd);
+              const x1 = Math.max(selStart, selEnd);
+              const bi0 = plotXToBin(x0);
+              const bi1 = plotXToBin(x1);
+              histCtx.fillStyle = "rgba(66, 133, 244, 0.35)";
+              for (let i = bi0; i <= bi1 && i < numValueBins; i++) {
+                const raw = binnedCounts[i];
+                if (raw === 0) continue;
+                const v = useLog ? Math.log10(raw + 1) : raw;
+                const barH = (v / maxCount) * plotH;
+                const [bx0, bx1] = binToPlotX(i);
+                // Clip to selection bounds
+                const drawX = padL + Math.max(bx0, x0);
+                const drawX1 = padL + Math.min(bx1, x1);
+                histCtx.fillRect(drawX, padT + plotH - barH, Math.max(1, drawX1 - drawX), barH);
+              }
+            }
+
+            // Axes — crisp 1px lines
+            histCtx.strokeStyle = "#999";
+            histCtx.lineWidth = 1;
+            histCtx.beginPath();
+            histCtx.moveTo(snap(padL), snap(padT));
+            histCtx.lineTo(snap(padL), snap(padT + plotH));
+            histCtx.lineTo(snap(padL + plotW), snap(padT + plotH));
+            histCtx.stroke();
+
+            // X-axis — nice round ticks
+            histCtx.fillStyle = "#333";
+            histCtx.font = "10px sans-serif";
+            histCtx.textAlign = "center";
+            histCtx.textBaseline = "top";
+            const xTicks = niceTicks(histXMin, histXMax, 6);
+            for (const val of xTicks) {
+              const frac = (val - histXMin) / (histXMax - histXMin);
+              if (frac < 0 || frac > 1) continue;
+              const x = snap(padL + frac * plotW);
+              histCtx.beginPath();
+              histCtx.moveTo(x, snap(padT + plotH));
+              histCtx.lineTo(x, snap(padT + plotH + 4));
+              histCtx.stroke();
+              histCtx.fillText(formatTickLabel(val), padL + frac * plotW, padT + plotH + 5);
+            }
+
+            // Y-axis — nice round ticks showing actual counts
+            histCtx.textAlign = "right";
+            histCtx.textBaseline = "middle";
+            if (useLog) {
+              // For log scale, use powers of 10 as ticks on the count axis
+              const maxExp = Math.ceil(maxCount); // maxCount is log10(maxBin+1)
+              const step = maxExp <= 4 ? 1 : Math.ceil(maxExp / 4);
+              for (let e = 0; e <= maxExp; e += step) {
+                const frac = maxCount > 0 ? e / maxCount : 0;
+                if (frac > 1) break;
+                const y = snap(padT + plotH - frac * plotH);
+                histCtx.beginPath();
+                histCtx.moveTo(snap(padL - 4), y);
+                histCtx.lineTo(snap(padL), y);
+                histCtx.stroke();
+                const actual = Math.pow(10, e);
+                histCtx.fillText(
+                  actual >= 1e6 ? actual.toExponential(0) : actual.toLocaleString(),
+                  padL - 6,
+                  padT + plotH - frac * plotH
+                );
+              }
+            } else {
+              // Linear scale — use nice ticks on count values
+              const yTicks = niceTicks(0, maxCount, 4);
+              for (const val of yTicks) {
+                const frac = val / maxCount;
+                if (frac > 1) break;
+                const y = snap(padT + plotH - frac * plotH);
+                histCtx.beginPath();
+                histCtx.moveTo(snap(padL - 4), y);
+                histCtx.lineTo(snap(padL), y);
+                histCtx.stroke();
+                histCtx.fillText(
+                  formatTickLabel(val),
+                  padL - 6,
+                  padT + plotH - frac * plotH
+                );
+              }
+            }
+          }
+
+          drawHistogram();
+          histLogCheckbox.addEventListener("change", () => {
+            drawHistogram();
+          });
+
+          // Drag-to-select on histogram
+          function histXToPixelVal(px) {
+            return histXMin + (px / plotW) * histRange;
+          }
+
+          const fmtVal = (v) => {
+            if (Math.abs(v) >= 1e5 || (Math.abs(v) < 0.01 && v !== 0))
+              return v.toExponential(2);
+            return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1);
+          };
+
+          function computeSelectionPercent() {
+            if (selStart === null || selEnd === null) return;
+            const x0 = Math.max(0, Math.min(selStart, selEnd));
+            const x1 = Math.min(plotW, Math.max(selStart, selEnd));
+            const bi0 = plotXToBin(x0);
+            const bi1 = plotXToBin(x1);
+            let selectedCount = 0;
+            for (let i = bi0; i <= bi1 && i < numValueBins; i++) {
+              selectedCount += binnedCounts[i];
+            }
+            const pct = histogram.total > 0
+              ? ((selectedCount / histogram.total) * 100).toFixed(3)
+              : "0.000";
+            const v0 = histXMin + bi0 * valueBinWidth;
+            const v1 = histXMin + (bi1 + 1) * valueBinWidth;
+            histInfo.textContent =
+              `${fmtVal(v0)} – ${fmtVal(v1)}: ${pct}% of pixels`;
+          }
+
+          histCanvas.addEventListener("mousedown", (e) => {
+            const rect = histCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left - padL;
+            selStart = Math.max(0, Math.min(plotW, x));
+            selEnd = selStart;
+            isDragging = true;
+            e.preventDefault();
+          });
+
+          function showBinTooltip(e) {
+            const rect = histCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left - padL;
+            if (x < 0 || x >= plotW) { histInfo.textContent = ""; return; }
+            const bi = plotXToBin(x);
+            if (bi < 0 || bi >= numValueBins) return;
+            const count = binnedCounts[bi];
+            const valLo = histXMin + bi * valueBinWidth;
+            const valHi = valLo + valueBinWidth;
+            histInfo.textContent =
+              `${fmtVal(valLo)} – ${fmtVal(valHi)}: ${Math.round(count).toLocaleString()} pixels`;
+          }
+
+          histCanvas.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+              const rect = histCanvas.getBoundingClientRect();
+              const x = e.clientX - rect.left - padL;
+              selEnd = Math.max(0, Math.min(plotW, x));
+              drawHistogram();
+              computeSelectionPercent();
+            } else {
+              showBinTooltip(e);
+            }
+          });
+
+          const stopDrag = () => { isDragging = false; };
+          histCanvas.addEventListener("mouseup", stopDrag);
+          histCanvas.addEventListener("mouseleave", () => {
+            isDragging = false;
+            // Restore selection info if there is one, otherwise clear
+            if (selStart !== null && selEnd !== null) {
+              computeSelectionPercent();
+            } else {
+              histInfo.textContent = "";
+            }
+          });
         }
 
         document.body.appendChild(contextMenu);
