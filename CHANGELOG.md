@@ -1,4 +1,5 @@
-# Change Log
+# ⚠️ *Please refer to GitHub releases for future change logs.*
+## Change Log
 
 All notable changes to the "simple-fits-viewer" extension will be documented in this file.
 
