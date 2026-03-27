@@ -61,7 +61,17 @@
                     }
                 ]
             }
-        ]
+        ],
+        "configuration": {
+            "title": "Simple FITS Viewer",
+            "properties": {
+                "simple-fits-viewer.autoZScale": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically apply z-scale stretch when opening FITS images. When disabled, images display with full data range."
+                }
+            }
+        }
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"

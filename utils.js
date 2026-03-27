@@ -111,9 +111,14 @@ function parseFITSImage(arrayBuffer, dataView) {
     }
     offset += totalBytes;
     console.timeLog("parseFITSImage", "parseFITSImageData");
+    console.timeEnd("parseFITSImage", "parseFITSImage done");
 
+    // console.log(header, normalizedData);
+    return [header, width, height, data];
+}
+
+function normalizeData(data, vmin, vmax) {
     // Normalize Data for Display
-    const { vmin, vmax } = zscale(data);
     console.timeLog("parseFITSImage", "zscale");
     // const normalizedData = data.map(
     //     (value) => ((value - vmin) / (vmax - vmin)) * 255
@@ -125,17 +130,15 @@ function parseFITSImage(arrayBuffer, dataView) {
     for (let i = 0; i < data.length; i++) {
         normalizedData[i] = data[i] * scale + _offset;
     }
-    console.timeLog("parseFITSImage", "normalizeData");
+    console.timeLog("normalizeData", "normalizeData");
 
-    console.timeEnd("parseFITSImage", "parseFITSImage done");
-
-    // console.log(header, normalizedData);
-    return [header, normalizedData, width, height, data];
+    return normalizedData;
 }
-
 
 function zscale(
     values,
+    histogram,
+    autoZscale,
     n_samples = 1000,
     contrast = 0.25,
     max_reject = 0.5,
@@ -144,6 +147,12 @@ function zscale(
     max_iterations = 5
 ) {
     console.time("zscale");
+
+    if (!autoZscale) {
+        const vmin = histogram.min;
+        const vmax = histogram.max;
+        return { vmin, vmax };
+    }
 
     // Sample the image
     const stride = Math.max(1, Math.floor(values.length / n_samples));
