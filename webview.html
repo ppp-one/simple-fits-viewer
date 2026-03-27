@@ -164,6 +164,8 @@
       let activeContextMenu = null;
       let showGrid = false;
       let wcs = null;
+      let autoZScale = true;
+      let doDrawApertureCircles = true;
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
@@ -1093,7 +1095,7 @@
       // Wire up controls
       autoZ.addEventListener("click", () => {
         if (!imageData) return;
-        const z = zscale(imageData);
+        const z = zscale(imageData, histogram, autoZScale);
         // Set sliders to the percentiles corresponding to zscale values
         const pmin = percentileForValue(z.vmin);
         const pmax = percentileForValue(z.vmax);
@@ -1617,8 +1619,13 @@
         console.timeLog("renderMonochromeImage", "DataView created");
 
         // Step 3: Parse the FITS header and data
-        [headerData, normalizedData, imageWidth, imageHeight, imageData] =
-          parseFITSImage(arrayBuffer, dataView);
+        [headerData, imageWidth, imageHeight, imageData] = parseFITSImage(arrayBuffer, dataView);
+
+        // Step 4: normalize data for displaying
+        normalizedData = normalizeData(imageData);
+
+        // Step 5: build histogram and set percentile sliders (0-100th percentile)
+        histogram = buildHistogram(imageData, 4096);
 
         displayHeaderTable(headerData);
 
@@ -1685,9 +1692,7 @@
 
         // Initialize stretch sliders and values based on data
         try {
-          // build histogram and set percentile sliders (0-100th percentile)
-          histogram = buildHistogram(imageData, 4096);
-          const z = zscale(imageData);
+          const z = zscale(imageData, histogram, autoZScale);
 
           // slider range is percent
           stretchMin.min = 0;
@@ -1853,7 +1858,9 @@
           // Reject hot pixels: real stars have sharpness > ~0.3 (PSF spreads
           // light to neighbors), while hot pixels drop to ~0 at bin 1.
           if (snr > 5 && fwhmResult.fwhm > 0 && fwhmResult.sharpness > 0.2) {
-            drawApertureCircles(fwhmResult, scaleX / currentTransform.k);
+            if (doDrawApertureCircles) {
+                drawApertureCircles(fwhmResult, scaleX / currentTransform.k);
+            }
 
             // Display FWHM information
             let fwhm = fwhmResult.fwhm;
@@ -1937,6 +1944,34 @@
       console.time("loadData");
       window.addEventListener("message", (event) => {
         const message = event.data;
+        // Set autoZscale when event data contains it
+        // This shall be called BEFORE reacting to settingChanged
+        if (message.autoZScale !== undefined) {
+            autoZScale = message.autoZScale;
+        }
+        if (message.doDrawApertureCircles !== undefined) {
+            doDrawApertureCircles = message.doDrawApertureCircles;
+        }
+        // React to changes of settings by the user
+        if (message.command === 'settingChanged') {
+            autoZScale = message.autoZScale;
+            doDrawApertureCircles = message.doDrawApertureCircles;
+            if (imageData) {
+                if (autoZScale) {
+                    // Re-run auto z-scale (simulate clicking the Auto button)
+                    document.getElementById('autoZ').click();
+                } else {
+                    // Reset to full data range
+                    const stretchMin = document.getElementById('stretchMin');
+                    const stretchMax = document.getElementById('stretchMax');
+                    stretchMin.value = stretchMin.min;
+                    stretchMax.value = stretchMax.max;
+                    stretchMin.dispatchEvent(new Event('input'));
+                    stretchMax.dispatchEvent(new Event('input'));
+                }
+            }
+            return;
+        }
         if (message.command === "loadData") {
           renderMonochromeImage(message.fileUri);
           setupZoom(); // Initialize zoom after rendering
