@@ -51,12 +51,14 @@ class FITSFileEditor {
                             // Read the autoZScale setting
                             const config = vscode.workspace.getConfiguration('simple-fits-viewer');
                             const autoZScale = config.get('autoZScale', true);
+                            const doDrawApertureCircles = config.get('drawApertureCircles', true);
 
                             // Send the data to the webview
                             webviewPanel.webview.postMessage({
                                 command: 'loadData',
                                 fileUri: fitsFileUri.toString(),
-                                autoZScale: autoZScale
+                                autoZScale: autoZScale,
+                                doDrawApertureCircles: doDrawApertureCircles
                             });
                         }
 
@@ -89,6 +91,14 @@ class FITSFileEditor {
                 webviewPanel.webview.postMessage({
                     command: 'settingChanged',
                     autoZScale: autoZScale
+                });
+            }
+            if (e.affectsConfiguration('simple-fits-viewer.drawApertureCircles')) {
+                const config = vscode.workspace.getConfiguration('simple-fits-viewer');
+                const doDrawApertureCircles = config.get('drawApertureCircles', true);
+                webviewPanel.webview.postMessage({
+                    command: 'settingChanged',
+                    doDrawApertureCircles: doDrawApertureCircles
                 });
             }
         });

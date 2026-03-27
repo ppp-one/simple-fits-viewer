@@ -165,6 +165,7 @@
       let showGrid = false;
       let wcs = null;
       let autoZScale = true;
+      let doDrawApertureCircles = true;
 
       const mainContainer = document.querySelector(".mainContainer");
       const headerTab = document.getElementById("headerTab");
@@ -1857,7 +1858,9 @@
           // Reject hot pixels: real stars have sharpness > ~0.3 (PSF spreads
           // light to neighbors), while hot pixels drop to ~0 at bin 1.
           if (snr > 5 && fwhmResult.fwhm > 0 && fwhmResult.sharpness > 0.2) {
-            drawApertureCircles(fwhmResult, scaleX / currentTransform.k);
+            if (doDrawApertureCircles) {
+                drawApertureCircles(fwhmResult, scaleX / currentTransform.k);
+            }
 
             // Display FWHM information
             let fwhm = fwhmResult.fwhm;
@@ -1946,9 +1949,13 @@
         if (message.autoZScale !== undefined) {
             autoZScale = message.autoZScale;
         }
+        if (message.doDrawApertureCircles !== undefined) {
+            doDrawApertureCircles = message.doDrawApertureCircles;
+        }
         // React to changes of settings by the user
         if (message.command === 'settingChanged') {
             autoZScale = message.autoZScale;
+            doDrawApertureCircles = message.doDrawApertureCircles;
             if (imageData) {
                 if (autoZScale) {
                     // Re-run auto z-scale (simulate clicking the Auto button)
