@@ -1,5 +1,5 @@
 function parseFITSImage(arrayBuffer, dataView) {
-    
+
     console.time("parseFITSImage");
 
     // Very basic FITS header parsing
@@ -50,7 +50,7 @@ function parseFITSImage(arrayBuffer, dataView) {
         const buf = new ArrayBuffer(totalBytes);
         const dst = new Uint8Array(buf);
         for (let i = 0; i < totalBytes; i += 2) {
-            dst[i]     = src[i + 1];
+            dst[i] = src[i + 1];
             dst[i + 1] = src[i];
         }
         const raw = new Int16Array(buf);
@@ -65,7 +65,7 @@ function parseFITSImage(arrayBuffer, dataView) {
         const buf = new ArrayBuffer(totalBytes);
         const dst = new Uint8Array(buf);
         for (let i = 0; i < totalBytes; i += 4) {
-            dst[i]     = src[i + 3];
+            dst[i] = src[i + 3];
             dst[i + 1] = src[i + 2];
             dst[i + 2] = src[i + 1];
             dst[i + 3] = src[i];
@@ -79,7 +79,7 @@ function parseFITSImage(arrayBuffer, dataView) {
         const buf = new ArrayBuffer(totalBytes);
         const dst = new Uint8Array(buf);
         for (let i = 0; i < totalBytes; i += 4) {
-            dst[i]     = src[i + 3];
+            dst[i] = src[i + 3];
             dst[i + 1] = src[i + 2];
             dst[i + 2] = src[i + 1];
             dst[i + 3] = src[i];
@@ -93,7 +93,7 @@ function parseFITSImage(arrayBuffer, dataView) {
         const buf = new ArrayBuffer(totalBytes);
         const dst = new Uint8Array(buf);
         for (let i = 0; i < totalBytes; i += 8) {
-            dst[i]     = src[i + 7];
+            dst[i] = src[i + 7];
             dst[i + 1] = src[i + 6];
             dst[i + 2] = src[i + 5];
             dst[i + 3] = src[i + 4];
@@ -158,7 +158,7 @@ function zscale(
     const stride = Math.max(1, Math.floor(values.length / n_samples));
     const samples = [];
     for (let i = 0; i < values.length && samples.length < n_samples; i += stride) {
-        samples.push(values[i]);
+        if (!isNaN(values[i])) samples.push(values[i]);
     }
     console.timeLog("zscale", "sampleImage");
 

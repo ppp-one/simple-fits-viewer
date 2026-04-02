@@ -240,7 +240,7 @@ function extractSubarray(image, centerX, centerY, size) {
 function calculateAdaptiveFWHM(x, y, _plateScale) {
     // Start with a reasonable box size
     let boxSize = 20;
-    if (_plateScale === undefined) {
+    if (_plateScale === undefined || _plateScale == null) {
         _plateScale = 1.0;
     } else {
         // set box to 20" in pixels
@@ -285,7 +285,6 @@ function calculateAdaptiveFWHM(x, y, _plateScale) {
 
         iteration++;
     }
-    // console.log(`Iteration ${iteration}: FWHM = ${fwhmResult.fwhm}, Box size = ${boxSize}`);
 
     // Adjust center coordinates to global image coordinates
     fwhmResult.center.x += offsetX;
@@ -299,7 +298,7 @@ function drawApertureCircles(fwhmResult, scale) {
 
     // Draw the three aperture circles
     const { center, radii } = fwhmResult;
-    ctx.lineWidth = scale*2;    // Keep line width constant
+    ctx.lineWidth = scale * 2;    // Keep line width constant
 
     // FWHM circle
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';  // Black with transparency
