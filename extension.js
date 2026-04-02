@@ -48,10 +48,17 @@ class FITSFileEditor {
                             // Convert the document URI to a webview URI
                             const fitsFileUri = webviewPanel.webview.asWebviewUri(document.uri);
 
+                            // Read the autoZScale setting
+                            const config = vscode.workspace.getConfiguration('simple-fits-viewer');
+                            const autoZScale = config.get('autoZScale', true);
+                            const doDrawApertureCircles = config.get('drawApertureCircles', true);
+
                             // Send the data to the webview
                             webviewPanel.webview.postMessage({
                                 command: 'loadData',
-                                fileUri: fitsFileUri.toString()
+                                fileUri: fitsFileUri.toString(),
+                                autoZScale: autoZScale,
+                                doDrawApertureCircles: doDrawApertureCircles
                             });
                         }
 
@@ -76,6 +83,26 @@ class FITSFileEditor {
         // Initial update
         updateWebview();
 
+        // Listen for setting changes and notify the webview
+        const configChangeSubscription = vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('simple-fits-viewer.autoZScale')) {
+                const config = vscode.workspace.getConfiguration('simple-fits-viewer');
+                const autoZScale = config.get('autoZScale', true);
+                webviewPanel.webview.postMessage({
+                    command: 'settingChanged',
+                    autoZScale: autoZScale
+                });
+            }
+            if (e.affectsConfiguration('simple-fits-viewer.drawApertureCircles')) {
+                const config = vscode.workspace.getConfiguration('simple-fits-viewer');
+                const doDrawApertureCircles = config.get('drawApertureCircles', true);
+                webviewPanel.webview.postMessage({
+                    command: 'settingChanged',
+                    doDrawApertureCircles: doDrawApertureCircles
+                });
+            }
+        });
+
         // Handle document changes
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(event => {
             if (event.document.uri.toString() === document.uri.toString()) {
@@ -83,9 +110,10 @@ class FITSFileEditor {
             }
         });
 
-        // Clean up subscription when panel is disposed
+        // Clean up subscriptions when panel is disposed
         webviewPanel.onDidDispose(() => {
             changeDocumentSubscription.dispose();
+            configChangeSubscription.dispose();
         });
     }
 
