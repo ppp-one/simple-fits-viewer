@@ -1095,7 +1095,7 @@
       // Wire up controls
       autoZ.addEventListener("click", () => {
         if (!imageData) return;
-        const z = zscale(imageData, histogram, autoZScale);
+        const z = zscale(imageData, histogram, true);
         // Set sliders to the percentiles corresponding to zscale values
         const pmin = percentileForValue(z.vmin);
         const pmax = percentileForValue(z.vmax);
