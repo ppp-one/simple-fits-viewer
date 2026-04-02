@@ -1296,8 +1296,8 @@
           profileCtx.canvas.height
         );
 
-        // Find max value for scaling
-        const maxVal = Math.max(...profileData);
+        // Find max value for scaling (excluding NaN)
+        const maxVal = Math.max(...profileData.filter(v => !isNaN(v)));
 
         // Draw background grid
         profileCtx.strokeStyle = gridColor;
@@ -1321,13 +1321,19 @@
         profileCtx.strokeStyle = profileColor;
         profileCtx.beginPath();
         if (isHorizontal) {
+          let needsMove = true;
           profileData.forEach((val, index) => {
             const x =
               ((index - offset) / (imageWidth / currentTransform.k)) *
               profileCtx.canvas.width;
+            if (isNaN(val)) {
+              needsMove = true;
+              return;
+            }
             const y = profileCtx.canvas.height * (1 - val / maxVal);
-            if (index === 0) {
+            if (needsMove) {
               profileCtx.moveTo(x, y);
+              needsMove = false;
             } else {
               const prevY =
                 profileCtx.canvas.height *
@@ -1345,13 +1351,19 @@
             }
           });
         } else {
+          let needsMove = true;
           profileData.forEach((val, index) => {
-            const x = profileCtx.canvas.width * (1 - val / maxVal);
             const y =
               ((index - offset) / (imageHeight / currentTransform.k)) *
               profileCtx.canvas.height;
-            if (index === 0) {
+            if (isNaN(val)) {
+              needsMove = true;
+              return;
+            }
+            const x = profileCtx.canvas.width * (1 - val / maxVal);
+            if (needsMove) {
               profileCtx.moveTo(x, y);
+              needsMove = false;
             } else {
               const prevX =
                 profileCtx.canvas.width * (1 - profileData[index - 1] / maxVal);
