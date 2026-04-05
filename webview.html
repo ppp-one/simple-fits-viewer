@@ -1890,9 +1890,6 @@
           .scaleExtent([1, 100]) // Zoom range
           .on("zoom", (event) => {
             let transform = event.transform;
-            currentTransform = transform;
-
-            imageInteractionHandler(event.sourceEvent, imageWidth, imageHeight);
 
             const right =
               (transform.x - imageWidth / scaleX) / (transform.k / scaleX) +
@@ -1926,6 +1923,10 @@
               transform.y = top_scaled - bottom_scaled;
             }
 
+            // Update currentTransform only after clamping so the line profile
+            // always uses the same transform that is applied to the image.
+            currentTransform = transform;
+
             // Compute visible canvas size and resample from the original resolution
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
@@ -1938,6 +1939,12 @@
 
             if (showGrid) {
               drawWCSGrid();
+            }
+
+            // Update line profile after currentTransform is clamped so the
+            // profile position matches the rendered image position.
+            if (event.sourceEvent) {
+              imageInteractionHandler(event.sourceEvent, imageWidth, imageHeight);
             }
           });
 
