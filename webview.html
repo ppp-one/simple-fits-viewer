@@ -1303,8 +1303,9 @@
           const valueCell = document.createElement("td");
           const commentCell = document.createElement("td");
           keyCell.textContent = key;
-          valueCell.textContent = value.split("/")[0];
-          commentCell.textContent = value.split("/")[1];
+          const slashIdx = value.indexOf("/");
+          valueCell.textContent = slashIdx !== -1 ? value.substring(0, slashIdx).trim() : value.trim();
+          commentCell.textContent = slashIdx !== -1 ? value.substring(slashIdx + 1).trim() : "";
           row.appendChild(keyCell);
           row.appendChild(valueCell);
           row.appendChild(commentCell);
