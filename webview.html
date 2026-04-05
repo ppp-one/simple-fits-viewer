@@ -230,25 +230,34 @@
             window.innerWidth / imageWidth,
             window.innerHeight / imageHeight
           );
-          canvasContainer.style.width = `${imageWidth * scaleFactor - 100}px`;
-          canvasContainer.style.height = `${imageHeight * scaleFactor - 100}px`;
-          canvas.style.width = `${imageWidth * scaleFactor - 100}px`;
-          canvas.style.height = `${imageHeight * scaleFactor - 100}px`;
-          gridCanvas.style.width = `${imageWidth * scaleFactor - 100}px`;
-          gridCanvas.style.height = `${imageHeight * scaleFactor - 100}px`;
+          const displayWidth = imageWidth * scaleFactor - 100;
+          const displayHeight = imageHeight * scaleFactor - 100;
+
+          canvasContainer.style.width = `${displayWidth}px`;
+          canvasContainer.style.height = `${displayHeight}px`;
+          canvas.style.width = `${displayWidth}px`;
+          canvas.style.height = `${displayHeight}px`;
+          gridCanvas.style.width = `${displayWidth}px`;
+          gridCanvas.style.height = `${displayHeight}px`;
 
           rect = canvas.getBoundingClientRect();
 
-          gridCanvas.width = rect.width;
-          gridCanvas.height = rect.height;
+          // rect is zero when the canvas is hidden (header view is showing) —
+          // fall back to the computed display size so the header-container
+          // still gets the correct width on resize.
+          const effectiveWidth = rect.width || displayWidth;
+          const effectiveHeight = rect.height || displayHeight;
 
-          scaleX = canvas.width / rect.width;
-          scaleY = canvas.height / rect.height;
-          xProfileCanvas.width = rect.width;
-          yProfileCanvas.height = rect.height;
+          gridCanvas.width = effectiveWidth;
+          gridCanvas.height = effectiveHeight;
+
+          scaleX = canvas.width / effectiveWidth;
+          scaleY = canvas.height / effectiveHeight;
+          xProfileCanvas.width = effectiveWidth;
+          yProfileCanvas.height = effectiveHeight;
           document.querySelector(
             ".header-container"
-          ).style.width = `${rect.width}px`;
+          ).style.width = `${effectiveWidth}px`;
 
           if (showGrid) {
             drawWCSGrid();
