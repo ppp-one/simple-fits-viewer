@@ -1,0 +1,33 @@
+name: Publish VSCode Extension
+
+on:
+  push:
+    tags:
+      - 'v*'   # triggers on version tags like v1.0.0
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (if needed)
+        run: npm run build --if-present
+
+      - name: Install vsce
+        run: npm install -g vsce
+
+      - name: Publish
+        run: vsce publish -p $VSCE_PAT
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
