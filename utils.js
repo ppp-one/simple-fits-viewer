@@ -111,7 +111,7 @@ function parseFITSImage(arrayBuffer, dataView) {
     }
     offset += totalBytes;
     console.timeLog("parseFITSImage", "parseFITSImageData");
-    console.timeEnd("parseFITSImage", "parseFITSImage done");
+    console.timeEnd("parseFITSImage");
 
     // console.log(header, normalizedData);
     return [header, width, height, data];
@@ -119,7 +119,7 @@ function parseFITSImage(arrayBuffer, dataView) {
 
 function normalizeData(data, vmin, vmax) {
     // Normalize Data for Display
-    console.timeLog("parseFITSImage", "zscale");
+    console.time("normalizeData");
     // const normalizedData = data.map(
     //     (value) => ((value - vmin) / (vmax - vmin)) * 255
     // );
@@ -130,7 +130,7 @@ function normalizeData(data, vmin, vmax) {
     for (let i = 0; i < data.length; i++) {
         normalizedData[i] = data[i] * scale + _offset;
     }
-    console.timeLog("normalizeData", "normalizeData");
+    console.timeEnd("normalizeData");
 
     return normalizedData;
 }
@@ -151,6 +151,7 @@ function zscale(
     if (!autoZscale) {
         const vmin = histogram.min;
         const vmax = histogram.max;
+        console.timeEnd("zscale");
         return { vmin, vmax };
     }
 
@@ -233,6 +234,7 @@ function zscale(
         vmax = Math.min(vmax, median + (npix - center_pixel) * slope);
     }
     console.timeLog("zscale", "updateMinMax");
+    console.timeEnd("zscale");
 
     return { vmin, vmax };
 }
