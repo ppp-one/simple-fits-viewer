@@ -143,7 +143,7 @@
 
       let offscreenCanvas, offscreenCtx;
       let useWebGL = false;
-      let webglAvailable = false;
+      let useGPUSetting = true;
       let gl = null;
       let glProgram = null;
       let glUniforms = {};
@@ -370,34 +370,6 @@
 
         contextMenu.appendChild(saveOption);
 
-        // GPU toggle option
-        const gpuOption = document.createElement("div");
-        gpuOption.style.cursor = webglAvailable ? "pointer" : "default";
-        gpuOption.style.padding = "3px";
-        gpuOption.style.opacity = webglAvailable ? "1" : "0.4";
-        if (webglAvailable) {
-          gpuOption.textContent = useWebGL ? "GPU: ON" : "GPU: OFF";
-          addHoverEffect(gpuOption);
-          gpuOption.addEventListener("click", () => {
-            if (useWebGL) {
-              // Switch to CPU
-              useWebGL = false;
-              offscreenCanvas = document.createElement("canvas");
-              offscreenCanvas.width = imageWidth;
-              offscreenCanvas.height = imageHeight;
-              offscreenCtx = offscreenCanvas.getContext("2d");
-              gpuOption.textContent = "GPU: OFF";
-            } else {
-              // Switch to GPU
-              useWebGL = initWebGL(imageWidth, imageHeight, imageData);
-              gpuOption.textContent = useWebGL ? "GPU: ON" : "GPU: OFF";
-            }
-            applyStretchFromInputs();
-          });
-        } else {
-          gpuOption.textContent = "GPU: unavailable";
-        }
-        contextMenu.appendChild(gpuOption);
 
         // Move the stretch controls into the context menu while it's open
         const stretchControlsEl = document.getElementById("stretchControls");
@@ -1685,9 +1657,8 @@
         canvas.width = imageWidth;
         canvas.height = imageHeight;
 
-        // Try WebGL for GPU-accelerated stretch
-        useWebGL = initWebGL(imageWidth, imageHeight, imageData);
-        webglAvailable = useWebGL;
+        // Try WebGL for GPU-accelerated stretch (if enabled in settings)
+        useWebGL = useGPUSetting ? initWebGL(imageWidth, imageHeight, imageData) : false;
         if (useWebGL) {
           console.log("WebGL acceleration enabled");
         } else {
@@ -1975,11 +1946,26 @@
         if (message.doDrawApertureCircles !== undefined) {
             doDrawApertureCircles = message.doDrawApertureCircles;
         }
+        if (message.useGPU !== undefined) {
+            useGPUSetting = message.useGPU;
+        }
         // React to changes of settings by the user
         if (message.command === 'settingChanged') {
             autoZScale = message.autoZScale;
             doDrawApertureCircles = message.doDrawApertureCircles;
-            if (imageData) {
+            if (message.useGPU !== undefined && imageData) {
+                if (useGPUSetting) {
+                    useWebGL = initWebGL(imageWidth, imageHeight, imageData);
+                } else {
+                    useWebGL = false;
+                    offscreenCanvas = document.createElement("canvas");
+                    offscreenCanvas.width = imageWidth;
+                    offscreenCanvas.height = imageHeight;
+                    offscreenCtx = offscreenCanvas.getContext("2d");
+                }
+                applyStretchFromInputs();
+            }
+            if (imageData && message.useGPU === undefined) {
                 if (autoZScale) {
                     // Re-run auto z-scale (simulate clicking the Auto button)
                     document.getElementById('autoZ').click();

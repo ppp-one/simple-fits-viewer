@@ -62,15 +62,17 @@ class FITSFileEditor {
                             const config = vscode.workspace.getConfiguration('simple-fits-viewer');
                             const autoZScale = config.get('autoZScale', true);
                             const doDrawApertureCircles = config.get('drawApertureCircles', true);
+                            const useGPU = config.get('useGPU', true);
 
-                            log(`Webview ready — sending loadData (autoZScale=${autoZScale}, drawApertureCircles=${doDrawApertureCircles})`);
+                            log(`Webview ready — sending loadData (autoZScale=${autoZScale}, drawApertureCircles=${doDrawApertureCircles}, useGPU=${useGPU})`);
 
                             // Send the data to the webview
                             webviewPanel.webview.postMessage({
                                 command: 'loadData',
                                 fileUri: fitsFileUri.toString(),
                                 autoZScale: autoZScale,
-                                doDrawApertureCircles: doDrawApertureCircles
+                                doDrawApertureCircles: doDrawApertureCircles,
+                                useGPU: useGPU
                             });
                         }
 
@@ -118,6 +120,15 @@ class FITSFileEditor {
                 webviewPanel.webview.postMessage({
                     command: 'settingChanged',
                     doDrawApertureCircles: doDrawApertureCircles
+                });
+            }
+            if (e.affectsConfiguration('simple-fits-viewer.useGPU')) {
+                const config = vscode.workspace.getConfiguration('simple-fits-viewer');
+                const useGPU = config.get('useGPU', true);
+                log(`Setting changed: useGPU=${useGPU}`);
+                webviewPanel.webview.postMessage({
+                    command: 'settingChanged',
+                    useGPU: useGPU
                 });
             }
         });
