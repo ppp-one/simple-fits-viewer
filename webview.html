@@ -1652,18 +1652,29 @@
 
         updateGridToggleVisibility(Boolean(wcs));
 
-        try {
-          // Get the pixel pitch and focal length from the FITS header
-          let pitch = parseFloat(headerData["XPIXSZ"].split("/")[0]);
-          let focalLength = parseFloat(headerData["FOCALLEN"].split("/")[0]);
-          let focalUnits = headerData["FOCALLEN"].split("/")[1];
-          if (focalUnits.includes("mm")) {
-            focalLength /= 1000;
+        if (wcs) {
+          // Derive plate scale from WCS CD matrix (arcsec/pixel)
+          const cd = wcs.cd;
+          const wcsScale = Math.sqrt(cd[0][0] ** 2 + cd[1][0] ** 2) * 3600;
+          if (wcsScale > 0) {
+            plateScale = wcsScale;
+            console.log("Plate scale from WCS:", plateScale);
           }
-          plateScale =
-            Math.atan((pitch * 1e-6) / focalLength) * (180 / Math.PI) * 3600;
-        } catch (error) {
-          console.error("Error parsing plate scale", error);
+        }
+        if (!plateScale) {
+          try {
+            // Fall back to pixel pitch and focal length from the FITS header
+            let pitch = parseFloat(headerData["XPIXSZ"].split("/")[0]);
+            let focalLength = parseFloat(headerData["FOCALLEN"].split("/")[0]);
+            let focalUnits = headerData["FOCALLEN"].split("/")[1];
+            if (focalUnits.includes("mm")) {
+              focalLength /= 1000;
+            }
+            plateScale =
+              Math.atan((pitch * 1e-6) / focalLength) * (180 / Math.PI) * 3600;
+          } catch (error) {
+            console.error("Error parsing plate scale", error);
+          }
         }
 
         console.timeLog("renderMonochromeImage", "Plate scale calculated");
