@@ -458,21 +458,22 @@
           histSep.style.margin = "6px 0";
           contextMenu.appendChild(histSep);
 
-          // Determine x-axis range from BITPIX
+          // Determine x-axis range options
           const bitpixRaw = headerData["BITPIX"]
             ? parseInt(headerData["BITPIX"].split("/")[0])
             : null;
-          let histXMin = 0;
-          let histXMax = histogram.max;
-          if (bitpixRaw && bitpixRaw > 0) {
-            // Integer data: range is 0 to 2^bits - 1
-            histXMin = 0;
-            histXMax = Math.pow(2, bitpixRaw) - 1;
-          } else {
-            // Float data: use actual data range
-            histXMin = histogram.min;
-            histXMax = histogram.max;
-          }
+          const isIntegerBitpix = bitpixRaw && bitpixRaw > 0;
+          const bitpixXMin = 0;
+          const bitpixXMax = isIntegerBitpix
+            ? Math.pow(2, bitpixRaw) - 1
+            : histogram.max;
+          const dataXMin = histogram.min;
+          const dataXMax = histogram.max;
+
+          // Default: BITPIX range for integer data, data range for floats
+          let useBitpixRange = isIntegerBitpix;
+          let histXMin = useBitpixRange ? bitpixXMin : dataXMin;
+          let histXMax = useBitpixRange ? bitpixXMax : dataXMax;
 
           const histW = 300, histH = 150;
           const padL = 50, padR = 10, padT = 5, padB = 25;
@@ -492,6 +493,12 @@
           histTitle.textContent = "Histogram";
           histHeader.appendChild(histTitle);
 
+          // Group the toggles so they sit close together on the right
+          const histToggleGroup = document.createElement("div");
+          histToggleGroup.style.display = "flex";
+          histToggleGroup.style.alignItems = "center";
+          histToggleGroup.style.gap = "8px";
+
           const histLogLabel = document.createElement("label");
           histLogLabel.style.display = "flex";
           histLogLabel.style.alignItems = "center";
@@ -504,7 +511,27 @@
           histLogCheckbox.checked = true;
           histLogLabel.appendChild(histLogCheckbox);
           histLogLabel.appendChild(document.createTextNode("Log"));
-          histHeader.appendChild(histLogLabel);
+          histToggleGroup.appendChild(histLogLabel);
+
+          // X-axis range toggle: BITPIX full range vs. actual data min/max
+          let histBitpixCheckbox = null;
+          if (isIntegerBitpix) {
+            const histBitpixLabel = document.createElement("label");
+            histBitpixLabel.style.display = "flex";
+            histBitpixLabel.style.alignItems = "center";
+            histBitpixLabel.style.gap = "4px";
+            histBitpixLabel.style.fontSize = "12px";
+            histBitpixLabel.style.cursor = "pointer";
+            histBitpixLabel.style.fontWeight = "normal";
+            histBitpixCheckbox = document.createElement("input");
+            histBitpixCheckbox.type = "checkbox";
+            histBitpixCheckbox.checked = useBitpixRange;
+            histBitpixLabel.appendChild(histBitpixCheckbox);
+            histBitpixLabel.appendChild(document.createTextNode("BITPIX scale"));
+            histToggleGroup.appendChild(histBitpixLabel);
+          }
+
+          histHeader.appendChild(histToggleGroup);
 
           contextMenu.appendChild(histHeader);
 
@@ -569,20 +596,27 @@
             return val.toPrecision(3);
           }
 
-          // Build display bins with a fixed pixel-value width of 10
-          // for integer images, or fall back to plot-width bins for floats
-          const isIntegerBitpix = bitpixRaw && bitpixRaw > 0;
-          const valueBinWidth = isIntegerBitpix ? 10 : (histXMax - histXMin) / plotW;
-          const numValueBins = Math.ceil((histXMax - histXMin) / valueBinWidth) || 1;
-          const binnedCounts = new Float64Array(numValueBins);
-          for (let i = 0; i < histogram.nbins; i++) {
-            const binCenter =
-              histogram.min + (i + 0.5) * histogram.binWidth;
-            let di = Math.floor((binCenter - histXMin) / valueBinWidth);
-            if (di < 0) di = 0;
-            if (di >= numValueBins) di = numValueBins - 1;
-            binnedCounts[di] += histogram.counts[i];
+          // Mutable bin state — rebuilt whenever the x-axis range toggle changes
+          let valueBinWidth, numValueBins, binnedCounts, histRange;
+          function rebuildBins() {
+            histXMin = useBitpixRange ? bitpixXMin : dataXMin;
+            histXMax = useBitpixRange ? bitpixXMax : dataXMax;
+            histRange = histXMax - histXMin;
+            // 10-value-wide bins for full BITPIX range; 1px-per-plotpx otherwise
+            valueBinWidth = (isIntegerBitpix && useBitpixRange)
+              ? 10
+              : (histRange / plotW);
+            numValueBins = Math.ceil(histRange / valueBinWidth) || 1;
+            binnedCounts = new Float64Array(numValueBins);
+            for (let i = 0; i < histogram.nbins; i++) {
+              const binCenter = histogram.min + (i + 0.5) * histogram.binWidth;
+              let di = Math.floor((binCenter - histXMin) / valueBinWidth);
+              if (di < 0) di = 0;
+              if (di >= numValueBins) di = numValueBins - 1;
+              binnedCounts[di] += histogram.counts[i];
+            }
           }
+          rebuildBins();
 
           // Selection state
           let selStart = null, selEnd = null, isDragging = false;
@@ -593,7 +627,6 @@
           }
 
           // Map a value-bin index to plot pixel x range
-          const histRange = histXMax - histXMin;
           function binToPlotX(binIdx) {
             const x0 = ((binIdx * valueBinWidth) / histRange) * plotW;
             const x1 = (((binIdx + 1) * valueBinWidth) / histRange) * plotW;
@@ -735,6 +768,15 @@
           histLogCheckbox.addEventListener("change", () => {
             drawHistogram();
           });
+          if (histBitpixCheckbox) {
+            histBitpixCheckbox.addEventListener("change", () => {
+              useBitpixRange = histBitpixCheckbox.checked;
+              selStart = null;
+              selEnd = null;
+              rebuildBins();
+              drawHistogram();
+            });
+          }
 
           // Drag-to-select on histogram
           function histXToPixelVal(px) {
