@@ -75,6 +75,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Draw FWHM aperture circles"
+                },
+                "simple-fits-viewer.useGPU": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Use GPU (WebGL) acceleration for rendering FITS images when available."
                 }
             }
         }

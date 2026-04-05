@@ -143,7 +143,7 @@
 
       let offscreenCanvas, offscreenCtx;
       let useWebGL = false;
-      let webglAvailable = false;
+      let useGPUSetting = true;
       let gl = null;
       let glProgram = null;
       let glUniforms = {};
@@ -230,25 +230,34 @@
             window.innerWidth / imageWidth,
             window.innerHeight / imageHeight
           );
-          canvasContainer.style.width = `${imageWidth * scaleFactor - 100}px`;
-          canvasContainer.style.height = `${imageHeight * scaleFactor - 100}px`;
-          canvas.style.width = `${imageWidth * scaleFactor - 100}px`;
-          canvas.style.height = `${imageHeight * scaleFactor - 100}px`;
-          gridCanvas.style.width = `${imageWidth * scaleFactor - 100}px`;
-          gridCanvas.style.height = `${imageHeight * scaleFactor - 100}px`;
+          const displayWidth = imageWidth * scaleFactor - 100;
+          const displayHeight = imageHeight * scaleFactor - 100;
+
+          canvasContainer.style.width = `${displayWidth}px`;
+          canvasContainer.style.height = `${displayHeight}px`;
+          canvas.style.width = `${displayWidth}px`;
+          canvas.style.height = `${displayHeight}px`;
+          gridCanvas.style.width = `${displayWidth}px`;
+          gridCanvas.style.height = `${displayHeight}px`;
 
           rect = canvas.getBoundingClientRect();
 
-          gridCanvas.width = rect.width;
-          gridCanvas.height = rect.height;
+          // rect is zero when the canvas is hidden (header view is showing) —
+          // fall back to the computed display size so the header-container
+          // still gets the correct width on resize.
+          const effectiveWidth = rect.width || displayWidth;
+          const effectiveHeight = rect.height || displayHeight;
 
-          scaleX = canvas.width / rect.width;
-          scaleY = canvas.height / rect.height;
-          xProfileCanvas.width = rect.width;
-          yProfileCanvas.height = rect.height;
+          gridCanvas.width = effectiveWidth;
+          gridCanvas.height = effectiveHeight;
+
+          scaleX = canvas.width / effectiveWidth;
+          scaleY = canvas.height / effectiveHeight;
+          xProfileCanvas.width = effectiveWidth;
+          yProfileCanvas.height = effectiveHeight;
           document.querySelector(
             ".header-container"
-          ).style.width = `${rect.width}px`;
+          ).style.width = `${effectiveWidth}px`;
 
           if (showGrid) {
             drawWCSGrid();
@@ -370,34 +379,6 @@
 
         contextMenu.appendChild(saveOption);
 
-        // GPU toggle option
-        const gpuOption = document.createElement("div");
-        gpuOption.style.cursor = webglAvailable ? "pointer" : "default";
-        gpuOption.style.padding = "3px";
-        gpuOption.style.opacity = webglAvailable ? "1" : "0.4";
-        if (webglAvailable) {
-          gpuOption.textContent = useWebGL ? "GPU: ON" : "GPU: OFF";
-          addHoverEffect(gpuOption);
-          gpuOption.addEventListener("click", () => {
-            if (useWebGL) {
-              // Switch to CPU
-              useWebGL = false;
-              offscreenCanvas = document.createElement("canvas");
-              offscreenCanvas.width = imageWidth;
-              offscreenCanvas.height = imageHeight;
-              offscreenCtx = offscreenCanvas.getContext("2d");
-              gpuOption.textContent = "GPU: OFF";
-            } else {
-              // Switch to GPU
-              useWebGL = initWebGL(imageWidth, imageHeight, imageData);
-              gpuOption.textContent = useWebGL ? "GPU: ON" : "GPU: OFF";
-            }
-            applyStretchFromInputs();
-          });
-        } else {
-          gpuOption.textContent = "GPU: unavailable";
-        }
-        contextMenu.appendChild(gpuOption);
 
         // Move the stretch controls into the context menu while it's open
         const stretchControlsEl = document.getElementById("stretchControls");
@@ -477,21 +458,22 @@
           histSep.style.margin = "6px 0";
           contextMenu.appendChild(histSep);
 
-          // Determine x-axis range from BITPIX
+          // Determine x-axis range options
           const bitpixRaw = headerData["BITPIX"]
             ? parseInt(headerData["BITPIX"].split("/")[0])
             : null;
-          let histXMin = 0;
-          let histXMax = histogram.max;
-          if (bitpixRaw && bitpixRaw > 0) {
-            // Integer data: range is 0 to 2^bits - 1
-            histXMin = 0;
-            histXMax = Math.pow(2, bitpixRaw) - 1;
-          } else {
-            // Float data: use actual data range
-            histXMin = histogram.min;
-            histXMax = histogram.max;
-          }
+          const isIntegerBitpix = bitpixRaw && bitpixRaw > 0;
+          const bitpixXMin = 0;
+          const bitpixXMax = isIntegerBitpix
+            ? Math.pow(2, bitpixRaw) - 1
+            : histogram.max;
+          const dataXMin = histogram.min;
+          const dataXMax = histogram.max;
+
+          // Default: BITPIX range for integer data, data range for floats
+          let useBitpixRange = isIntegerBitpix;
+          let histXMin = useBitpixRange ? bitpixXMin : dataXMin;
+          let histXMax = useBitpixRange ? bitpixXMax : dataXMax;
 
           const histW = 300, histH = 150;
           const padL = 50, padR = 10, padT = 5, padB = 25;
@@ -511,6 +493,12 @@
           histTitle.textContent = "Histogram";
           histHeader.appendChild(histTitle);
 
+          // Group the toggles so they sit close together on the right
+          const histToggleGroup = document.createElement("div");
+          histToggleGroup.style.display = "flex";
+          histToggleGroup.style.alignItems = "center";
+          histToggleGroup.style.gap = "8px";
+
           const histLogLabel = document.createElement("label");
           histLogLabel.style.display = "flex";
           histLogLabel.style.alignItems = "center";
@@ -523,7 +511,27 @@
           histLogCheckbox.checked = true;
           histLogLabel.appendChild(histLogCheckbox);
           histLogLabel.appendChild(document.createTextNode("Log"));
-          histHeader.appendChild(histLogLabel);
+          histToggleGroup.appendChild(histLogLabel);
+
+          // X-axis range toggle: BITPIX full range vs. actual data min/max
+          let histBitpixCheckbox = null;
+          if (isIntegerBitpix) {
+            const histBitpixLabel = document.createElement("label");
+            histBitpixLabel.style.display = "flex";
+            histBitpixLabel.style.alignItems = "center";
+            histBitpixLabel.style.gap = "4px";
+            histBitpixLabel.style.fontSize = "12px";
+            histBitpixLabel.style.cursor = "pointer";
+            histBitpixLabel.style.fontWeight = "normal";
+            histBitpixCheckbox = document.createElement("input");
+            histBitpixCheckbox.type = "checkbox";
+            histBitpixCheckbox.checked = useBitpixRange;
+            histBitpixLabel.appendChild(histBitpixCheckbox);
+            histBitpixLabel.appendChild(document.createTextNode("BITPIX scale"));
+            histToggleGroup.appendChild(histBitpixLabel);
+          }
+
+          histHeader.appendChild(histToggleGroup);
 
           contextMenu.appendChild(histHeader);
 
@@ -588,20 +596,27 @@
             return val.toPrecision(3);
           }
 
-          // Build display bins with a fixed pixel-value width of 10
-          // for integer images, or fall back to plot-width bins for floats
-          const isIntegerBitpix = bitpixRaw && bitpixRaw > 0;
-          const valueBinWidth = isIntegerBitpix ? 10 : (histXMax - histXMin) / plotW;
-          const numValueBins = Math.ceil((histXMax - histXMin) / valueBinWidth) || 1;
-          const binnedCounts = new Float64Array(numValueBins);
-          for (let i = 0; i < histogram.nbins; i++) {
-            const binCenter =
-              histogram.min + (i + 0.5) * histogram.binWidth;
-            let di = Math.floor((binCenter - histXMin) / valueBinWidth);
-            if (di < 0) di = 0;
-            if (di >= numValueBins) di = numValueBins - 1;
-            binnedCounts[di] += histogram.counts[i];
+          // Mutable bin state — rebuilt whenever the x-axis range toggle changes
+          let valueBinWidth, numValueBins, binnedCounts, histRange;
+          function rebuildBins() {
+            histXMin = useBitpixRange ? bitpixXMin : dataXMin;
+            histXMax = useBitpixRange ? bitpixXMax : dataXMax;
+            histRange = histXMax - histXMin;
+            // 10-value-wide bins for full BITPIX range; 1px-per-plotpx otherwise
+            valueBinWidth = (isIntegerBitpix && useBitpixRange)
+              ? 10
+              : (histRange / plotW);
+            numValueBins = Math.ceil(histRange / valueBinWidth) || 1;
+            binnedCounts = new Float64Array(numValueBins);
+            for (let i = 0; i < histogram.nbins; i++) {
+              const binCenter = histogram.min + (i + 0.5) * histogram.binWidth;
+              let di = Math.floor((binCenter - histXMin) / valueBinWidth);
+              if (di < 0) di = 0;
+              if (di >= numValueBins) di = numValueBins - 1;
+              binnedCounts[di] += histogram.counts[i];
+            }
           }
+          rebuildBins();
 
           // Selection state
           let selStart = null, selEnd = null, isDragging = false;
@@ -612,7 +627,6 @@
           }
 
           // Map a value-bin index to plot pixel x range
-          const histRange = histXMax - histXMin;
           function binToPlotX(binIdx) {
             const x0 = ((binIdx * valueBinWidth) / histRange) * plotW;
             const x1 = (((binIdx + 1) * valueBinWidth) / histRange) * plotW;
@@ -754,6 +768,15 @@
           histLogCheckbox.addEventListener("change", () => {
             drawHistogram();
           });
+          if (histBitpixCheckbox) {
+            histBitpixCheckbox.addEventListener("change", () => {
+              useBitpixRange = histBitpixCheckbox.checked;
+              selStart = null;
+              selEnd = null;
+              rebuildBins();
+              drawHistogram();
+            });
+          }
 
           // Drag-to-select on histogram
           function histXToPixelVal(px) {
@@ -1652,18 +1675,29 @@
 
         updateGridToggleVisibility(Boolean(wcs));
 
-        try {
-          // Get the pixel pitch and focal length from the FITS header
-          let pitch = parseFloat(headerData["XPIXSZ"].split("/")[0]);
-          let focalLength = parseFloat(headerData["FOCALLEN"].split("/")[0]);
-          let focalUnits = headerData["FOCALLEN"].split("/")[1];
-          if (focalUnits.includes("mm")) {
-            focalLength /= 1000;
+        if (wcs) {
+          // Derive plate scale from WCS CD matrix (arcsec/pixel)
+          const cd = wcs.cd;
+          const wcsScale = Math.sqrt(cd[0][0] ** 2 + cd[1][0] ** 2) * 3600;
+          if (wcsScale > 0) {
+            plateScale = wcsScale;
+            console.log("Plate scale from WCS:", plateScale);
           }
-          plateScale =
-            Math.atan((pitch * 1e-6) / focalLength) * (180 / Math.PI) * 3600;
-        } catch (error) {
-          console.error("Error parsing plate scale", error);
+        }
+        if (!plateScale) {
+          try {
+            // Fall back to pixel pitch and focal length from the FITS header
+            let pitch = parseFloat(headerData["XPIXSZ"].split("/")[0]);
+            let focalLength = parseFloat(headerData["FOCALLEN"].split("/")[0]);
+            let focalUnits = headerData["FOCALLEN"].split("/")[1];
+            if (focalUnits.includes("mm")) {
+              focalLength /= 1000;
+            }
+            plateScale =
+              Math.atan((pitch * 1e-6) / focalLength) * (180 / Math.PI) * 3600;
+          } catch (error) {
+            console.error("Error parsing plate scale", error);
+          }
         }
 
         console.timeLog("renderMonochromeImage", "Plate scale calculated");
@@ -1674,9 +1708,8 @@
         canvas.width = imageWidth;
         canvas.height = imageHeight;
 
-        // Try WebGL for GPU-accelerated stretch
-        useWebGL = initWebGL(imageWidth, imageHeight, imageData);
-        webglAvailable = useWebGL;
+        // Try WebGL for GPU-accelerated stretch (if enabled in settings)
+        useWebGL = useGPUSetting ? initWebGL(imageWidth, imageHeight, imageData) : false;
         if (useWebGL) {
           console.log("WebGL acceleration enabled");
         } else {
@@ -1899,9 +1932,6 @@
           .scaleExtent([1, 100]) // Zoom range
           .on("zoom", (event) => {
             let transform = event.transform;
-            currentTransform = transform;
-
-            imageInteractionHandler(event.sourceEvent, imageWidth, imageHeight);
 
             const right =
               (transform.x - imageWidth / scaleX) / (transform.k / scaleX) +
@@ -1935,6 +1965,10 @@
               transform.y = top_scaled - bottom_scaled;
             }
 
+            // Update currentTransform only after clamping so the line profile
+            // always uses the same transform that is applied to the image.
+            currentTransform = transform;
+
             // Compute visible canvas size and resample from the original resolution
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
@@ -1947,6 +1981,12 @@
 
             if (showGrid) {
               drawWCSGrid();
+            }
+
+            // Update line profile after currentTransform is clamped so the
+            // profile position matches the rendered image position.
+            if (event.sourceEvent) {
+              imageInteractionHandler(event.sourceEvent, imageWidth, imageHeight);
             }
           });
 
@@ -1964,11 +2004,26 @@
         if (message.doDrawApertureCircles !== undefined) {
             doDrawApertureCircles = message.doDrawApertureCircles;
         }
+        if (message.useGPU !== undefined) {
+            useGPUSetting = message.useGPU;
+        }
         // React to changes of settings by the user
         if (message.command === 'settingChanged') {
             autoZScale = message.autoZScale;
             doDrawApertureCircles = message.doDrawApertureCircles;
-            if (imageData) {
+            if (message.useGPU !== undefined && imageData) {
+                if (useGPUSetting) {
+                    useWebGL = initWebGL(imageWidth, imageHeight, imageData);
+                } else {
+                    useWebGL = false;
+                    offscreenCanvas = document.createElement("canvas");
+                    offscreenCanvas.width = imageWidth;
+                    offscreenCanvas.height = imageHeight;
+                    offscreenCtx = offscreenCanvas.getContext("2d");
+                }
+                applyStretchFromInputs();
+            }
+            if (imageData && message.useGPU === undefined) {
                 if (autoZScale) {
                     // Re-run auto z-scale (simulate clicking the Auto button)
                     document.getElementById('autoZ').click();
