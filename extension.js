@@ -12,7 +12,9 @@ function log(message) {
 function activate(context) {
     log("Extension 'simple-fits-viewer' is now active!");
     context.subscriptions.push(
-        vscode.window.registerCustomEditorProvider('fitFileViewer', new FITSFileEditor(context))
+        vscode.window.registerCustomEditorProvider('fitFileViewer', new FITSFileEditor(context), {
+            webviewOptions: { retainContextWhenHidden: true }
+        })
     );
 }
 
