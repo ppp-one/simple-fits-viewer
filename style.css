@@ -128,7 +128,7 @@ td {
   text-align: left;
   padding: 2px 8px;
   /* white-space: nowrap;  */
-  border-bottom: var(--vscode-commandCenter-inactiveBorder, rgba(128,128,128,0.3)) 1px solid;
+  border-bottom: var(--vscode-commandCenter-inactiveBorder, rgba(128, 128, 128, 0.3)) 1px solid;
 }
 
 th:nth-child(1),
@@ -152,7 +152,7 @@ tr {
 }
 
 tr:hover {
-  background-color: var(--vscode-commandCenter-inactiveBorder, rgba(128,128,128,0.15));
+  background-color: var(--vscode-commandCenter-inactiveBorder, rgba(128, 128, 128, 0.15));
 }
 
 .header-container {
@@ -171,7 +171,7 @@ tr:hover {
 
 #searchInput {
   padding: 8px;
-  border: 1px solid var(--vscode-commandCenter-inactiveBorder, rgba(128,128,128,0.3));
+  border: 1px solid var(--vscode-commandCenter-inactiveBorder, rgba(128, 128, 128, 0.3));
   border-radius: 4px;
   color: var(--vscode-editor-foreground, inherit);
   background-color: var(--vscode-editor-background, transparent);
@@ -256,10 +256,6 @@ tr:hover {
   width: 100%;
 }
 
-.stretch-controls.menu-active {
-  width: 240px;
-  padding: 6px 4px;
-}
 /* Grayscale slider styling */
 .stretch-controls input[type=range] {
   -webkit-appearance: none;
@@ -269,21 +265,31 @@ tr:hover {
   background: transparent;
   margin: 0;
 }
-.stretch-controls input[type=range]:focus { outline: none; }
+
+.stretch-controls input[type=range]:focus {
+  outline: none;
+}
 
 .stretch-controls input[type=range]::-webkit-slider-runnable-track {
   height: 6px;
   background: #e6e6e6;
   border-radius: 4px;
 }
+
 .stretch-controls input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: #8a8a8a;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   margin-top: -4px;
 }
-.stretch-controls input[type=range]:hover::-webkit-slider-thumb { background: #6f6f6f; }
-.stretch-controls input[type=range]:active::-webkit-slider-thumb { background: #4f4f4f; }
+
+.stretch-controls input[type=range]:hover::-webkit-slider-thumb {
+  background: #6f6f6f;
+}
+
+.stretch-controls input[type=range]:active::-webkit-slider-thumb {
+  background: #4f4f4f;
+}
