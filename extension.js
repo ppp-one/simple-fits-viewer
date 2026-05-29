@@ -135,17 +135,20 @@ class FITSFileEditor {
             }
         });
 
-        // Handle document changes
-        const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(event => {
-            if (event.document.uri.toString() === document.uri.toString()) {
-                updateWebview();
-            }
+        // Watch the file on disk for changes (e.g. new capture written by acquisition software)
+        const fitsFileUri = webviewPanel.webview.asWebviewUri(document.uri);
+        const fileWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(path.dirname(document.uri.fsPath)), path.basename(document.uri.fsPath))
+        );
+        fileWatcher.onDidChange(() => {
+            log(`File changed on disk: ${path.basename(document.uri.fsPath)} — reloading`);
+            webviewPanel.webview.postMessage({ command: 'reload', fileUri: fitsFileUri.toString() });
         });
 
         // Clean up subscriptions when panel is disposed
         webviewPanel.onDidDispose(() => {
             log(`Webview disposed: ${path.basename(document.uri.fsPath)}`);
-            changeDocumentSubscription.dispose();
+            fileWatcher.dispose();
             configChangeSubscription.dispose();
         });
     }
