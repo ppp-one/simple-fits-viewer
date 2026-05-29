@@ -67,6 +67,9 @@
             useGPU: msg.useGPU,
           });
         }
+        if (msg.command === 'reload') {
+          viewer.load(msg.fileUri);
+        }
       });
       vscode.postMessage({ command: 'ready' });
     };
