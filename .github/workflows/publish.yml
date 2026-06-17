@@ -8,6 +8,8 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -38,6 +40,12 @@ jobs:
           name: vscode-extension-vsix
           path: ${{ env.VSIX_PATH }}
           if-no-files-found: error
+
+      - name: Attach VSIX to release
+        if: github.event_name == 'release'
+        run: gh release upload "${{ github.event.release.tag_name }}" "$VSIX_PATH" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish
         run: vsce publish --packagePath "$VSIX_PATH" -p "$VSCE_PAT"
