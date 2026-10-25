@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+const { proxyFetch } = require('./proxy-fetch');
 
 const outputChannel = vscode.window.createOutputChannel('Simple FITS Viewer');
 
@@ -46,6 +47,9 @@ class FITSFileEditor {
             ]
         };
 
+        // Archive requests the extension runs for the webview: id -> abort function
+        const proxyRequests = new Map();
+
         // Function to update webview content
         const updateWebview = () => {
             try {
@@ -89,6 +93,21 @@ class FITSFileEditor {
                             } catch (err) {
                                 vscode.window.showErrorMessage(`Failed to open external link: ${err.message}`);
                             }
+                        }
+
+                        // Archive services without CORS headers (DASCH): the webview cannot fetch them
+                        if (message.command === 'proxyFetch') {
+                            log(`Archive request: ${message.method || 'GET'} ${message.url}`);
+                            proxyRequests.set(message.id, proxyFetch(message, (result) => {
+                                proxyRequests.delete(message.id);
+                                if (result.error) log(`[WARN] Archive request failed: ${result.error}`);
+                                webviewPanel.webview.postMessage(result);
+                            }));
+                        }
+
+                        if (message.command === 'proxyFetchAbort') {
+                            proxyRequests.get(message.id)?.();
+                            proxyRequests.delete(message.id);
                         }
                     },
                     undefined,
@@ -150,6 +169,8 @@ class FITSFileEditor {
             log(`Webview disposed: ${path.basename(document.uri.fsPath)}`);
             fileWatcher.dispose();
             configChangeSubscription.dispose();
+            for (const abort of proxyRequests.values()) abort();
+            proxyRequests.clear();
         });
     }
 

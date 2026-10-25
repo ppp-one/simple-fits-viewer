@@ -48,10 +48,42 @@
       };
     })();
 
+    // Archive requests run by the extension (proxyFetch below): id -> {resolve, reject}
+    const proxyRequests = new Map();
+    let nextProxyId = 0;
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+      if (msg.command !== 'proxyFetchResult') return;
+      const request = proxyRequests.get(msg.id);
+      if (!request) return;
+      proxyRequests.delete(msg.id);
+      if (msg.error) request.reject(new Error(msg.error));
+      else request.resolve(new Response(msg.body, { status: msg.status, headers: { 'Content-Type': msg.contentType } }));
+    });
+
     // VSCode bridge: options for the auto-created FITSViewer. Webviews cannot open
     // links themselves, so external URLs (e.g. SIMBAD) go to the extension.
     window.__vscodeViewerOptions = {
       onOpenExternal: (url) => vscode.postMessage({ command: 'openExternal', url }),
+      // fetch() for archive services without CORS headers (DASCH): the extension
+      // runs the request. Text responses only.
+      proxyFetch: (url, init = {}) => new Promise((resolve, reject) => {
+        const id = ++nextProxyId;
+        const { signal } = init;
+        if (signal?.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+        proxyRequests.set(id, { resolve, reject });
+        // The extension always answers within its own timeout; this catches an
+        // extension host that does not know 'proxyFetch'
+        setTimeout(() => {
+          if (proxyRequests.delete(id)) reject(new Error('The extension did not answer. Reload the window.'));
+        }, 150000);
+        signal?.addEventListener('abort', () => {
+          if (!proxyRequests.delete(id)) return;
+          vscode.postMessage({ command: 'proxyFetchAbort', id });
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+        vscode.postMessage({ command: 'proxyFetch', id, url, method: init.method, headers: init.headers, body: init.body });
+      }),
     };
 
     // VSCode bridge: called by the module once FITSViewer is instantiated.

@@ -13,6 +13,12 @@ A simple Visual Studio Code extension for viewing FITS (Flexible Image Transport
 - **Header Display:** Access and search headers associated with each FITS file.
 - **FWHM/seeing calculation:** Calculate the Full Width at Half Maximum (FWHM) of stars in the image.
 - **Interactive Line Profiles:** View and analyze line profiles of FITS images.
+- **Archive Images:** For images with a WCS, right-click and choose *Archive images* to overlay an archive image of the same field, resampled onto your pixels. Blend it with the opacity slider or blink between the two. Sources:
+  - Dated photographic plates from the [STScI Digitized Sky Survey](https://archive.stsci.edu/cgi-bin/dss_form): POSS-I (1950s) and POSS-II/UKST (1980s-1990s).
+  - Harvard [DASCH](https://dasch.cfa.harvard.edu/) plates (1880s-1990s), filtered by limiting magnitude, with buttons to step through them in time.
+  - Sky surveys from [CDS HiPS](https://aladin.cds.unistra.fr/hips/) (the surveys Aladin and SIMBAD show): DSS2, 2MASS, SDSS, Pan-STARRS, DESI Legacy Surveys, ZTF, GALEX and AllWISE.
+
+  Archive servers can take 5-20 s to answer. Request times are in the *Simple FITS Viewer* output channel.
 
 ## Requirements
 
