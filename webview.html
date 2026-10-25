@@ -48,6 +48,12 @@
       };
     })();
 
+    // VSCode bridge: options for the auto-created FITSViewer. Webviews cannot open
+    // links themselves, so external URLs (e.g. SIMBAD) go to the extension.
+    window.__vscodeViewerOptions = {
+      onOpenExternal: (url) => vscode.postMessage({ command: 'openExternal', url }),
+    };
+
     // VSCode bridge: called by the module once FITSViewer is instantiated.
     window.__vscodeOnViewerReady = function (viewer) {
       window.addEventListener('message', (event) => {
